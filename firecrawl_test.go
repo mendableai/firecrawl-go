@@ -1,13 +1,11 @@
 package firecrawl
 
 import (
-	"log"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,11 +14,7 @@ var API_URL string
 var TEST_API_KEY string
 
 func init() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
-	}
-	API_URL = os.Getenv("API_URL")
+	API_URL = "http://127.0.0.1:3002"
 	TEST_API_KEY = os.Getenv("TEST_API_KEY")
 }
 
