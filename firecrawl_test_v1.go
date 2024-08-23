@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var API_URL_V0 string
-var TEST_API_KEY_V0 string
+var API_URL string
+var TEST_API_KEY string
 
 func init() {
 	err := godotenv.Load("../.env")
@@ -24,14 +24,14 @@ func init() {
 	TEST_API_KEY = os.Getenv("TEST_API_KEY")
 }
 
-func TestNoAPIKeyV0(t *testing.T) {
-	_, err := NewFirecrawlApp("", API_URL, "v0")
+func TestNoAPIKey(t *testing.T) {
+	_, err := NewFirecrawlApp("", API_URL, "v1")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no API key provided")
 }
 
-func TestScrapeURLInvalidAPIKeyV0(t *testing.T) {
-	app, err := NewFirecrawlApp("invalid_api_key", API_URL, "v0")
+func TestScrapeURLInvalidAPIKey(t *testing.T) {
+	app, err := NewFirecrawlApp("invalid_api_key", API_URL, "v1")
 	require.NoError(t, err)
 
 	_, err = app.ScrapeURL("https://firecrawl.dev", nil)
@@ -39,8 +39,8 @@ func TestScrapeURLInvalidAPIKeyV0(t *testing.T) {
 	assert.Contains(t, err.Error(), "Unexpected error during scrape URL: Status code 401. Unauthorized: Invalid token")
 }
 
-func TestBlocklistedURLV0(t *testing.T) {
-	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v0")
+func TestBlocklistedURL(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v1")
 	require.NoError(t, err)
 
 	_, err = app.ScrapeURL("https://facebook.com/fake-test", nil)
@@ -48,8 +48,8 @@ func TestBlocklistedURLV0(t *testing.T) {
 	assert.Contains(t, err.Error(), "Unexpected error during scrape URL: Status code 403. Firecrawl currently does not support social media scraping due to policy restrictions.")
 }
 
-func TestSuccessfulResponseWithValidPreviewTokenV0(t *testing.T) {
-	app, err := NewFirecrawlApp("this_is_just_a_preview_token", API_URL, "v0")
+func TestSuccessfulResponseWithValidPreviewToken(t *testing.T) {
+	app, err := NewFirecrawlApp("this_is_just_a_preview_token", API_URL, "v1")
 	require.NoError(t, err)
 
 	response, err := app.ScrapeURL("https://roastmywebsite.ai", nil)
@@ -59,8 +59,8 @@ func TestSuccessfulResponseWithValidPreviewTokenV0(t *testing.T) {
 	assert.Contains(t, response.Content, "_Roast_")
 }
 
-func TestScrapeURLE2EV0(t *testing.T) {
-	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v0")
+func TestScrapeURLE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v1")
 	require.NoError(t, err)
 
 	response, err := app.ScrapeURL("https://roastmywebsite.ai", nil)
@@ -73,8 +73,8 @@ func TestScrapeURLE2EV0(t *testing.T) {
 	assert.Equal(t, response.HTML, "")
 }
 
-func TestSuccessfulResponseWithValidAPIKeyAndIncludeHTMLV0(t *testing.T) {
-	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v0")
+func TestSuccessfulResponseWithValidAPIKeyAndIncludeHTML(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v1")
 	require.NoError(t, err)
 
 	params := map[string]any{
@@ -92,8 +92,8 @@ func TestSuccessfulResponseWithValidAPIKeyAndIncludeHTMLV0(t *testing.T) {
 	assert.NotNil(t, response.Metadata)
 }
 
-func TestSuccessfulResponseForValidScrapeWithPDFFileV0(t *testing.T) {
-	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v0")
+func TestSuccessfulResponseForValidScrapeWithPDFFile(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v1")
 	require.NoError(t, err)
 
 	response, err := app.ScrapeURL("https://arxiv.org/pdf/astro-ph/9301001.pdf", nil)
@@ -104,8 +104,8 @@ func TestSuccessfulResponseForValidScrapeWithPDFFileV0(t *testing.T) {
 	assert.NotNil(t, response.Metadata)
 }
 
-func TestSuccessfulResponseForValidScrapeWithPDFFileWithoutExplicitExtensionV0(t *testing.T) {
-	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v0")
+func TestSuccessfulResponseForValidScrapeWithPDFFileWithoutExplicitExtension(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v1")
 	require.NoError(t, err)
 
 	response, err := app.ScrapeURL("https://arxiv.org/pdf/astro-ph/9301001", nil)
@@ -117,8 +117,8 @@ func TestSuccessfulResponseForValidScrapeWithPDFFileWithoutExplicitExtensionV0(t
 	assert.NotNil(t, response.Metadata)
 }
 
-func TestCrawlURLInvalidAPIKeyV0(t *testing.T) {
-	app, err := NewFirecrawlApp("invalid_api_key", API_URL, "v0")
+func TestCrawlURLInvalidAPIKey(t *testing.T) {
+	app, err := NewFirecrawlApp("invalid_api_key", API_URL, "v1")
 	require.NoError(t, err)
 
 	_, err = app.CrawlURL("https://firecrawl.dev", nil, false, 2, "")
@@ -126,8 +126,8 @@ func TestCrawlURLInvalidAPIKeyV0(t *testing.T) {
 	assert.Contains(t, err.Error(), "Unexpected error during start crawl job: Status code 401. Unauthorized: Invalid token")
 }
 
-func TestShouldReturnErrorForBlocklistedURLV0(t *testing.T) {
-	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v0")
+func TestShouldReturnErrorForBlocklistedURL(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v1")
 	require.NoError(t, err)
 
 	_, err = app.CrawlURL("https://twitter.com/fake-test", nil, false, 2, "")
@@ -135,8 +135,8 @@ func TestShouldReturnErrorForBlocklistedURLV0(t *testing.T) {
 	assert.Contains(t, err.Error(), "Unexpected error during start crawl job: Status code 403. Firecrawl currently does not support social media scraping due to policy restrictions.")
 }
 
-func TestCrawlURLWaitForCompletionE2EV0(t *testing.T) {
-	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v0")
+func TestCrawlURLWaitForCompletionE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v1")
 	require.NoError(t, err)
 
 	params := map[string]any{
@@ -154,8 +154,8 @@ func TestCrawlURLWaitForCompletionE2EV0(t *testing.T) {
 	assert.Contains(t, data[0].Content, "_Roast_")
 }
 
-func TestCrawlURLWithIdempotencyKeyE2EV0(t *testing.T) {
-	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v0")
+func TestCrawlURLWithIdempotencyKeyE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v1")
 	require.NoError(t, err)
 
 	uniqueIdempotencyKey := uuid.New().String()
@@ -178,8 +178,8 @@ func TestCrawlURLWithIdempotencyKeyE2EV0(t *testing.T) {
 	assert.Contains(t, err.Error(), "Conflict: Failed to start crawl job due to a conflict. Idempotency key already used")
 }
 
-func TestCheckCrawlStatusE2EV0(t *testing.T) {
-	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v0")
+func TestCheckCrawlStatusE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v1")
 	require.NoError(t, err)
 
 	params := map[string]any{
@@ -205,8 +205,8 @@ func TestCheckCrawlStatusE2EV0(t *testing.T) {
 	assert.Greater(t, len(statusResponse.Data), 0)
 }
 
-func TestSearchE2EV0(t *testing.T) {
-	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v0")
+func TestSearchE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v1")
 	require.NoError(t, err)
 
 	response, err := app.Search("test query", nil)
@@ -217,8 +217,8 @@ func TestSearchE2EV0(t *testing.T) {
 	assert.NotEqual(t, response[0].Content, "")
 }
 
-func TestSearchInvalidAPIKeyV0(t *testing.T) {
-	app, err := NewFirecrawlApp("invalid_api_key", API_URL, "v0")
+func TestSearchInvalidAPIKey(t *testing.T) {
+	app, err := NewFirecrawlApp("invalid_api_key", API_URL, "v1")
 	require.NoError(t, err)
 
 	_, err = app.Search("test query", nil)
@@ -226,8 +226,8 @@ func TestSearchInvalidAPIKeyV0(t *testing.T) {
 	assert.Contains(t, err.Error(), "Unexpected error during search: Status code 401. Unauthorized: Invalid token")
 }
 
-func TestLLMExtractionV0(t *testing.T) {
-	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v0")
+func TestLLMExtraction(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v1")
 	require.NoError(t, err)
 
 	params := map[string]any{
@@ -255,8 +255,8 @@ func TestLLMExtractionV0(t *testing.T) {
 	assert.IsType(t, true, response.LLMExtraction["is_open_source"])
 }
 
-func TestCancelCrawlJobInvalidAPIKeyV0(t *testing.T) {
-	app, err := NewFirecrawlApp("invalid_api_key", API_URL, "v0")
+func TestCancelCrawlJobInvalidAPIKey(t *testing.T) {
+	app, err := NewFirecrawlApp("invalid_api_key", API_URL, "v1")
 	require.NoError(t, err)
 
 	_, err = app.CancelCrawlJob("test query")
@@ -264,8 +264,8 @@ func TestCancelCrawlJobInvalidAPIKeyV0(t *testing.T) {
 	assert.Contains(t, err.Error(), "Unexpected error during cancel crawl job: Status code 401. Unauthorized: Invalid token")
 }
 
-func TestCancelNonExistingCrawlJobV0(t *testing.T) {
-	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v0")
+func TestCancelNonExistingCrawlJob(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v1")
 	require.NoError(t, err)
 
 	jobID := uuid.New().String()
@@ -274,8 +274,8 @@ func TestCancelNonExistingCrawlJobV0(t *testing.T) {
 	assert.Contains(t, err.Error(), "Job not found")
 }
 
-func TestCancelCrawlJobE2EV0(t *testing.T) {
-	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v0")
+func TestCancelCrawlJobE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL, "v1")
 	require.NoError(t, err)
 
 	response, err := app.CrawlURL("https://firecrawl.dev", nil, false, 2, "")

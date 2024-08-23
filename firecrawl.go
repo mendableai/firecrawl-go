@@ -12,8 +12,8 @@ import (
 	"time"
 )
 
-// FirecrawlDocumentMetadata represents metadata for a Firecrawl document
-type FirecrawlDocumentMetadata struct {
+// FirecrawlDocumentMetadataV0 represents metadata for a Firecrawl document for v0
+type FirecrawlDocumentMetadataV0 struct {
 	Title             string   `json:"title,omitempty"`
 	Description       string   `json:"description,omitempty"`
 	Language          string   `json:"language,omitempty"`
@@ -48,11 +48,64 @@ type FirecrawlDocumentMetadata struct {
 	PageError         string   `json:"pageError,omitempty"`
 }
 
-// FirecrawlDocument represents a document in Firecrawl
-type FirecrawlDocument struct {
+// FirecrawlDocumentMetadata represents metadata for a Firecrawl document for v1
+type FirecrawlDocumentMetadata struct {
+	Title             string   `json:"title,omitempty"`
+	Description       string   `json:"description,omitempty"`
+	Language          string   `json:"language,omitempty"`
+	Keywords          string   `json:"keywords,omitempty"`
+	Robots            string   `json:"robots,omitempty"`
+	OGTitle           string   `json:"ogTitle,omitempty"`
+	OGDescription     string   `json:"ogDescription,omitempty"`
+	OGURL             string   `json:"ogUrl,omitempty"`
+	OGImage           string   `json:"ogImage,omitempty"`
+	OGAudio           string   `json:"ogAudio,omitempty"`
+	OGDeterminer      string   `json:"ogDeterminer,omitempty"`
+	OGLocale          string   `json:"ogLocale,omitempty"`
+	OGLocaleAlternate []string `json:"ogLocaleAlternate,omitempty"`
+	OGSiteName        string   `json:"ogSiteName,omitempty"`
+	OGVideo           string   `json:"ogVideo,omitempty"`
+	DCTermsCreated    string   `json:"dctermsCreated,omitempty"`
+	DCDateCreated     string   `json:"dcDateCreated,omitempty"`
+	DCDate            string   `json:"dcDate,omitempty"`
+	DCTermsType       string   `json:"dctermsType,omitempty"`
+	DCType            string   `json:"dcType,omitempty"`
+	DCTermsAudience   string   `json:"dctermsAudience,omitempty"`
+	DCTermsSubject    string   `json:"dctermsSubject,omitempty"`
+	DCSubject         string   `json:"dcSubject,omitempty"`
+	DCDescription     string   `json:"dcDescription,omitempty"`
+	DCTermsKeywords   string   `json:"dctermsKeywords,omitempty"`
+	ModifiedTime      string   `json:"modifiedTime,omitempty"`
+	PublishedTime     string   `json:"publishedTime,omitempty"`
+	ArticleTag        string   `json:"articleTag,omitempty"`
+	ArticleSection    string   `json:"articleSection,omitempty"`
+	SourceURL         string   `json:"sourceURL,omitempty"`
+	StatusCode        int      `json:"statusCode,omitempty"`
+	Error             string   `json:"error,omitempty"`
+}
+
+// FirecrawlDocumentV0 represents a document in Firecrawl for v0
+type FirecrawlDocumentV0 struct {
 	ID            string                     `json:"id,omitempty"`
 	URL           string                     `json:"url,omitempty"`
 	Content       string                     `json:"content"`
+	Markdown      string                     `json:"markdown,omitempty"`
+	HTML          string                     `json:"html,omitempty"`
+	LLMExtraction map[string]any             `json:"llm_extraction,omitempty"`
+	CreatedAt     *time.Time                 `json:"createdAt,omitempty"`
+	UpdatedAt     *time.Time                 `json:"updatedAt,omitempty"`
+	Type          string                     `json:"type,omitempty"`
+	Metadata      *FirecrawlDocumentMetadata `json:"metadata,omitempty"`
+	ChildrenLinks []string                   `json:"childrenLinks,omitempty"`
+	Provider      string                     `json:"provider,omitempty"`
+	Warning       string                     `json:"warning,omitempty"`
+	Index         int                        `json:"index,omitempty"`
+}
+
+// FirecrawlDocument represents a document in Firecrawl for v1
+type FirecrawlDocument struct {
+	ID            string                     `json:"id,omitempty"`
+	URL           string                     `json:"url,omitempty"`
 	Markdown      string                     `json:"markdown,omitempty"`
 	HTML          string                     `json:"html,omitempty"`
 	LLMExtraction map[string]any             `json:"llm_extraction,omitempty"`
@@ -73,10 +126,22 @@ type ExtractorOptions struct {
 	ExtractionSchema any    `json:"extractionSchema,omitempty"`
 }
 
+// ScrapeResponseV0 represents the response for scraping operations for v0
+type ScrapeResponseV0 struct {
+	Success bool                 `json:"success"`
+	Data    *FirecrawlDocumentV0 `json:"data,omitempty"`
+}
+
 // ScrapeResponse represents the response for scraping operations
 type ScrapeResponse struct {
 	Success bool               `json:"success"`
 	Data    *FirecrawlDocument `json:"data,omitempty"`
+}
+
+// SearchResponseV0 represents the response for searching operations for v0
+type SearchResponseV0 struct {
+	Success bool                   `json:"success"`
+	Data    []*FirecrawlDocumentV0 `json:"data,omitempty"`
 }
 
 // SearchResponse represents the response for searching operations
@@ -85,27 +150,50 @@ type SearchResponse struct {
 	Data    []*FirecrawlDocument `json:"data,omitempty"`
 }
 
-// CrawlResponse represents the response for crawling operations
+// CrawlResponseV0 represents the response for crawling operations for v0
+type CrawlResponseV0 struct {
+	Success bool                   `json:"success"`
+	JobID   string                 `json:"jobId,omitempty"`
+	Data    []*FirecrawlDocumentV0 `json:"data,omitempty"`
+}
+
+// CrawlResponse represents the response for crawling operations for v1
 type CrawlResponse struct {
 	Success bool                 `json:"success"`
-	JobID   string               `json:"jobId,omitempty"`
+	ID      string               `json:"id,omitempty"`
 	Data    []*FirecrawlDocument `json:"data,omitempty"`
 }
 
-// JobStatusResponse represents the response for checking crawl job status
-type JobStatusResponse struct {
-	Success     bool                 `json:"success"`
-	Status      string               `json:"status"`
-	Current     int                  `json:"current,omitempty"`
-	CurrentURL  string               `json:"current_url,omitempty"`
-	CurrentStep string               `json:"current_step,omitempty"`
-	Total       int                  `json:"total,omitempty"`
-	JobID       string               `json:"jobId,omitempty"`
-	Data        []*FirecrawlDocument `json:"data,omitempty"`
-	PartialData []*FirecrawlDocument `json:"partial_data,omitempty"`
+// JobStatusResponseV0 represents the response for checking crawl job status for v0
+type JobStatusResponseV0 struct {
+	Success     bool                   `json:"success"`
+	Status      string                 `json:"status"`
+	Current     int                    `json:"current,omitempty"`
+	CurrentURL  string                 `json:"current_url,omitempty"`
+	CurrentStep string                 `json:"current_step,omitempty"`
+	Total       int                    `json:"total,omitempty"`
+	JobID       string                 `json:"jobId,omitempty"`
+	Data        []*FirecrawlDocumentV0 `json:"data,omitempty"`
+	PartialData []*FirecrawlDocumentV0 `json:"partial_data,omitempty"`
 }
 
-// CancelCrawlJobResponse represents the response for canceling a crawl job
+// CrawlStatusResponse (old JobStatusResponse) represents the response for checking crawl job status for v1
+type CrawlStatusResponse struct {
+	Status      string               `json:"status"`
+	TotalCount  int                  `json:"total_count,omitempty"`
+	CreditsUsed int                  `json:"credits_used,omitempty"`
+	ExpiresAt   string               `json:"expires_at,omitempty"`
+	Next        string               `json:"next,omitempty"`
+	Data        []*FirecrawlDocument `json:"data,omitempty"`
+}
+
+// CancelCrawlJobResponseV0 represents the response for canceling a crawl job for v0
+type CancelCrawlJobResponseV0 struct {
+	Success bool   `json:"success"`
+	Status  string `json:"status"`
+}
+
+// CancelCrawlJobResponse represents the response for canceling a crawl job for v1
 type CancelCrawlJobResponse struct {
 	Success bool   `json:"success"`
 	Status  string `json:"status"`
@@ -163,9 +251,10 @@ func withBackoff(backoff int) requestOption {
 
 // FirecrawlApp represents a client for the Firecrawl API.
 type FirecrawlApp struct {
-	APIKey string
-	APIURL string
-	Client *http.Client
+	APIKey  string
+	APIURL  string
+	Client  *http.Client
+	Version string
 }
 
 // NewFirecrawlApp creates a new instance of FirecrawlApp with the provided API key and API URL.
@@ -179,7 +268,7 @@ type FirecrawlApp struct {
 // Returns:
 //   - *FirecrawlApp: A new instance of FirecrawlApp configured with the provided or retrieved API key and API URL.
 //   - error: An error if the API key is not provided or retrieved.
-func NewFirecrawlApp(apiKey, apiURL string) (*FirecrawlApp, error) {
+func NewFirecrawlApp(apiKey, apiURL string, version string) (*FirecrawlApp, error) {
 	if apiKey == "" {
 		apiKey = os.Getenv("FIRECRAWL_API_KEY")
 		if apiKey == "" {
@@ -194,14 +283,19 @@ func NewFirecrawlApp(apiKey, apiURL string) (*FirecrawlApp, error) {
 		}
 	}
 
+	if version == "" {
+		version = "v1"
+	}
+
 	client := &http.Client{
 		Timeout: 60 * time.Second,
 	}
 
 	return &FirecrawlApp{
-		APIKey: apiKey,
-		APIURL: apiURL,
-		Client: client,
+		APIKey:  apiKey,
+		APIURL:  apiURL,
+		Client:  client,
+		Version: version,
 	}, nil
 }
 
@@ -212,9 +306,9 @@ func NewFirecrawlApp(apiKey, apiURL string) (*FirecrawlApp, error) {
 //   - params: Optional parameters for the scrape request, including extractor options for LLM extraction.
 //
 // Returns:
-//   - *FirecrawlDocument: The scraped document data.
+//   - *FirecrawlDocument or *FirecrawlDocumentV0: The scraped document data depending on the API version.
 //   - error: An error if the scrape request fails.
-func (app *FirecrawlApp) ScrapeURL(url string, params map[string]any) (*FirecrawlDocument, error) {
+func (app *FirecrawlApp) ScrapeURL(url string, params map[string]any) (any, error) {
 	headers := app.prepareHeaders("")
 	scrapeBody := map[string]any{"url": url}
 
@@ -238,7 +332,7 @@ func (app *FirecrawlApp) ScrapeURL(url string, params map[string]any) (*Firecraw
 
 	resp, err := app.makeRequest(
 		http.MethodPost,
-		fmt.Sprintf("%s/v0/scrape", app.APIURL),
+		fmt.Sprintf("%s/%s/scrape", app.APIURL, app.Version),
 		scrapeBody,
 		headers,
 		"scrape URL",
@@ -247,14 +341,24 @@ func (app *FirecrawlApp) ScrapeURL(url string, params map[string]any) (*Firecraw
 		return nil, err
 	}
 
-	var scrapeResponse ScrapeResponse
-	err = json.Unmarshal(resp, &scrapeResponse)
-	if err != nil {
-		return nil, err
+	if app.Version == "v0" {
+		var scrapeResponseV0 ScrapeResponseV0
+		err = json.Unmarshal(resp, &scrapeResponseV0)
+
+		if scrapeResponseV0.Success {
+			return scrapeResponseV0.Data, nil
+		}
+	} else if app.Version == "v1" {
+		var scrapeResponse ScrapeResponse
+		err = json.Unmarshal(resp, &scrapeResponse)
+
+		if scrapeResponse.Success {
+			return scrapeResponse.Data, nil
+		}
 	}
 
-	if scrapeResponse.Success {
-		return scrapeResponse.Data, nil
+	if err != nil {
+		return nil, err
 	}
 
 	return nil, fmt.Errorf("failed to scrape URL")
@@ -271,6 +375,11 @@ func (app *FirecrawlApp) ScrapeURL(url string, params map[string]any) (*Firecraw
 //   - error: An error if the search request fails.
 func (app *FirecrawlApp) Search(query string, params map[string]any) ([]*FirecrawlDocument, error) {
 	headers := app.prepareHeaders("")
+
+	if app.Version == "v1" {
+		return nil, fmt.Errorf("Search is not supported in v1")
+	}
+
 	searchBody := map[string]any{"query": query}
 	for k, v := range params {
 		searchBody[k] = v
