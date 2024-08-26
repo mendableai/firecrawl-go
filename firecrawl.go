@@ -104,19 +104,12 @@ type FirecrawlDocumentV0 struct {
 
 // FirecrawlDocument represents a document in Firecrawl for v1
 type FirecrawlDocument struct {
-	ID            string                     `json:"id,omitempty"`
-	URL           string                     `json:"url,omitempty"`
-	Markdown      string                     `json:"markdown,omitempty"`
-	HTML          string                     `json:"html,omitempty"`
-	LLMExtraction map[string]any             `json:"llm_extraction,omitempty"`
-	CreatedAt     *time.Time                 `json:"createdAt,omitempty"`
-	UpdatedAt     *time.Time                 `json:"updatedAt,omitempty"`
-	Type          string                     `json:"type,omitempty"`
-	Metadata      *FirecrawlDocumentMetadata `json:"metadata,omitempty"`
-	ChildrenLinks []string                   `json:"childrenLinks,omitempty"`
-	Provider      string                     `json:"provider,omitempty"`
-	Warning       string                     `json:"warning,omitempty"`
-	Index         int                        `json:"index,omitempty"`
+	Markdown   string                     `json:"markdown,omitempty"`
+	HTML       string                     `json:"html,omitempty"`
+	RawHTML    string                     `json:"rawHtml,omitempty"`
+	Screenshot string                     `json:"screenshot,omitempty"`
+	Links      []string                   `json:"links,omitempty"`
+	Metadata   *FirecrawlDocumentMetadata `json:"metadata,omitempty"`
 }
 
 // ExtractorOptions represents options for extraction.
@@ -144,12 +137,6 @@ type SearchResponseV0 struct {
 	Data    []*FirecrawlDocumentV0 `json:"data,omitempty"`
 }
 
-// SearchResponse represents the response for searching operations
-type SearchResponse struct {
-	Success bool                 `json:"success"`
-	Data    []*FirecrawlDocument `json:"data,omitempty"`
-}
-
 // CrawlResponseV0 represents the response for crawling operations for v0
 type CrawlResponseV0 struct {
 	Success bool                   `json:"success"`
@@ -162,6 +149,7 @@ type CrawlResponse struct {
 	Success bool                 `json:"success"`
 	ID      string               `json:"id,omitempty"`
 	Data    []*FirecrawlDocument `json:"data,omitempty"`
+	URL     string               `json:"url,omitempty"`
 }
 
 // JobStatusResponseV0 represents the response for checking crawl job status for v0
@@ -180,9 +168,9 @@ type JobStatusResponseV0 struct {
 // CrawlStatusResponse (old JobStatusResponse) represents the response for checking crawl job status for v1
 type CrawlStatusResponse struct {
 	Status      string               `json:"status"`
-	TotalCount  int                  `json:"total_count,omitempty"`
-	CreditsUsed int                  `json:"credits_used,omitempty"`
-	ExpiresAt   string               `json:"expires_at,omitempty"`
+	TotalCount  int                  `json:"totalCount,omitempty"`
+	CreditsUsed int                  `json:"creditsUsed,omitempty"`
+	ExpiresAt   string               `json:"expiresAt,omitempty"`
 	Next        string               `json:"next,omitempty"`
 	Data        []*FirecrawlDocument `json:"data,omitempty"`
 }
@@ -197,6 +185,13 @@ type CancelCrawlJobResponseV0 struct {
 type CancelCrawlJobResponse struct {
 	Success bool   `json:"success"`
 	Status  string `json:"status"`
+}
+
+// MapResponse represents the response for mapping operations
+type MapResponse struct {
+	Success bool     `json:"success"`
+	Links   []string `json:"links,omitempty"`
+	Error   string   `json:"error,omitempty"`
 }
 
 // requestOptions represents options for making requests.
@@ -373,7 +368,7 @@ func (app *FirecrawlApp) ScrapeURL(url string, params map[string]any) (any, erro
 // Returns:
 //   - []*FirecrawlDocument: A slice of FirecrawlDocument containing the search results.
 //   - error: An error if the search request fails.
-func (app *FirecrawlApp) Search(query string, params map[string]any) ([]*FirecrawlDocument, error) {
+func (app *FirecrawlApp) Search(query string, params map[string]any) ([]*FirecrawlDocumentV0, error) {
 	headers := app.prepareHeaders("")
 
 	if app.Version == "v1" {
@@ -396,7 +391,7 @@ func (app *FirecrawlApp) Search(query string, params map[string]any) ([]*Firecra
 		return nil, err
 	}
 
-	var searchResponse SearchResponse
+	var searchResponse SearchResponseV0
 	err = json.Unmarshal(resp, &searchResponse)
 	if err != nil {
 		return nil, err
@@ -430,7 +425,7 @@ func (app *FirecrawlApp) CrawlURL(url string, params map[string]any, waitUntilDo
 
 	resp, err := app.makeRequest(
 		http.MethodPost,
-		fmt.Sprintf("%s/v0/crawl", app.APIURL),
+		fmt.Sprintf("%s/%s/crawl", app.APIURL, app.Version),
 		crawlBody,
 		headers,
 		"start crawl job",
@@ -441,36 +436,62 @@ func (app *FirecrawlApp) CrawlURL(url string, params map[string]any, waitUntilDo
 		return nil, err
 	}
 
-	var crawlResponse CrawlResponse
-	err = json.Unmarshal(resp, &crawlResponse)
-	if err != nil {
-		return nil, err
+	if app.Version == "v0" {
+		var crawlResponse CrawlResponseV0
+		err = json.Unmarshal(resp, &crawlResponse)
+		if err != nil {
+			return nil, err
+		}
+
+		if waitUntilDone {
+			return app.monitorJobStatus(crawlResponse.JobID, headers, pollInterval, "")
+		}
+
+		if crawlResponse.JobID == "" {
+			return nil, fmt.Errorf("failed to get job ID")
+		}
+
+		return crawlResponse.JobID, nil
+	} else if app.Version == "v1" {
+		var crawlResponse CrawlResponse
+		err = json.Unmarshal(resp, &crawlResponse)
+		if err != nil {
+			return nil, err
+		}
+
+		if waitUntilDone {
+			return app.monitorJobStatus(crawlResponse.ID, headers, pollInterval, crawlResponse.URL)
+		}
+
+		if crawlResponse.ID == "" {
+			return nil, fmt.Errorf("failed to get job ID")
+		}
+
+		return crawlResponse.ID, nil
 	}
 
-	if waitUntilDone {
-		return app.monitorJobStatus(crawlResponse.JobID, headers, pollInterval)
-	}
-
-	if crawlResponse.JobID == "" {
-		return nil, fmt.Errorf("failed to get job ID")
-	}
-
-	return crawlResponse.JobID, nil
+	return nil, fmt.Errorf("invalid version")
 }
 
 // CheckCrawlStatus checks the status of a crawl job using the Firecrawl API.
 //
 // Parameters:
-//   - jobID: The ID of the crawl job to check.
+//   - ID: The ID of the crawl job to check.
 //
 // Returns:
-//   - *JobStatusResponse: The status of the crawl job.
+//   - *JobStatusResponse or *JobStatusResponseV0: The status of the crawl job.
 //   - error: An error if the crawl status check request fails.
-func (app *FirecrawlApp) CheckCrawlStatus(jobID string) (*JobStatusResponse, error) {
+func (app *FirecrawlApp) CheckCrawlStatus(ID string) (any, error) {
 	headers := app.prepareHeaders("")
+	apiURL := ""
+	if app.Version == "v0" {
+		apiURL = fmt.Sprintf("%s/v0/crawl/status/%s", app.APIURL, ID)
+	} else if app.Version == "v1" {
+		apiURL = fmt.Sprintf("%s/v1/crawl/%s", app.APIURL, ID)
+	}
 	resp, err := app.makeRequest(
 		http.MethodGet,
-		fmt.Sprintf("%s/v0/crawl/status/%s", app.APIURL, jobID),
+		apiURL,
 		nil,
 		headers,
 		"check crawl status",
@@ -481,28 +502,46 @@ func (app *FirecrawlApp) CheckCrawlStatus(jobID string) (*JobStatusResponse, err
 		return nil, err
 	}
 
-	var jobStatusResponse JobStatusResponse
-	err = json.Unmarshal(resp, &jobStatusResponse)
-	if err != nil {
-		return nil, err
+	if app.Version == "v0" {
+		var jobStatusResponse JobStatusResponseV0
+		err = json.Unmarshal(resp, &jobStatusResponse)
+		if err != nil {
+			return nil, err
+		}
+
+		return &jobStatusResponse, nil
+	} else if app.Version == "v1" {
+		var jobStatusResponse CrawlStatusResponse
+		err = json.Unmarshal(resp, &jobStatusResponse)
+		if err != nil {
+			return nil, err
+		}
+
+		return &jobStatusResponse, nil
 	}
 
-	return &jobStatusResponse, nil
+	return nil, fmt.Errorf("invalid version")
 }
 
 // CancelCrawlJob cancels a crawl job using the Firecrawl API.
 //
 // Parameters:
-//   - jobID: The ID of the crawl job to cancel.
+//   - ID: The ID of the crawl job to cancel.
 //
 // Returns:
 //   - string: The status of the crawl job after cancellation.
 //   - error: An error if the crawl job cancellation request fails.
-func (app *FirecrawlApp) CancelCrawlJob(jobID string) (string, error) {
+func (app *FirecrawlApp) CancelCrawlJob(ID string) (string, error) {
 	headers := app.prepareHeaders("")
+	apiURL := ""
+	if app.Version == "v0" {
+		apiURL = fmt.Sprintf("%s/v0/crawl/cancel/%s", app.APIURL, ID)
+	} else if app.Version == "v1" {
+		apiURL = fmt.Sprintf("%s/v1/crawl/%s", app.APIURL, ID)
+	}
 	resp, err := app.makeRequest(
 		http.MethodDelete,
-		fmt.Sprintf("%s/v0/crawl/cancel/%s", app.APIURL, jobID),
+		apiURL,
 		nil,
 		headers,
 		"cancel crawl job",
@@ -518,6 +557,50 @@ func (app *FirecrawlApp) CancelCrawlJob(jobID string) (string, error) {
 	}
 
 	return cancelCrawlJobResponse.Status, nil
+}
+
+// MapURL initiates a mapping operation for a URL using the Firecrawl API.
+//
+// Parameters:
+//   - url: The URL to map.
+//   - params: Optional parameters for the mapping request.
+//
+// Returns:
+//   - *MapResponse: The response from the mapping operation.
+//   - error: An error if the mapping request fails.
+func (app *FirecrawlApp) MapURL(url string, params map[string]any) (*MapResponse, error) {
+	if app.Version == "v0" {
+		return nil, fmt.Errorf("map is not supported in v0")
+	}
+
+	headers := app.prepareHeaders("")
+	jsonData := map[string]any{"url": url}
+	for k, v := range params {
+		jsonData[k] = v
+	}
+
+	resp, err := app.makeRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/%s/map", app.APIURL, app.Version),
+		jsonData,
+		headers,
+		"map",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var mapResponse MapResponse
+	err = json.Unmarshal(resp, &mapResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	if mapResponse.Success {
+		return &mapResponse, nil
+	} else {
+		return nil, fmt.Errorf("map operation failed: %s", mapResponse.Error)
+	}
 }
 
 // prepareHeaders prepares the headers for an HTTP request.
@@ -603,19 +686,26 @@ func (app *FirecrawlApp) makeRequest(method, url string, data map[string]any, he
 // monitorJobStatus monitors the status of a crawl job using the Firecrawl API.
 //
 // Parameters:
-//   - jobID: The ID of the crawl job to monitor.
+//   - ID: The ID of the crawl job to monitor.
 //   - headers: The headers to be included in the request.
 //   - pollInterval: The interval (in seconds) at which to poll the job status.
 //
 // Returns:
-//   - []*FirecrawlDocument: The crawl result if the job is completed.
+//   - []*FirecrawlDocument or []*FirecrawlDocumentV0: The crawl result if the job is completed.
 //   - error: An error if the crawl status check request fails.
-func (app *FirecrawlApp) monitorJobStatus(jobID string, headers map[string]string, pollInterval int) ([]*FirecrawlDocument, error) {
+func (app *FirecrawlApp) monitorJobStatus(ID string, headers map[string]string, pollInterval int, checkUrl string) (any, error) {
 	attempts := 0
+	apiURL := ""
+	if app.Version == "v0" {
+		apiURL = fmt.Sprintf("%s/v0/crawl/status/%s", app.APIURL, ID)
+	} else if app.Version == "v1" {
+		apiURL = checkUrl
+	}
+
 	for {
 		resp, err := app.makeRequest(
 			http.MethodGet,
-			fmt.Sprintf("%s/v0/crawl/status/%s", app.APIURL, jobID),
+			apiURL,
 			nil,
 			headers,
 			"check crawl status",
@@ -626,30 +716,59 @@ func (app *FirecrawlApp) monitorJobStatus(jobID string, headers map[string]strin
 			return nil, err
 		}
 
-		var statusData JobStatusResponse
-		err = json.Unmarshal(resp, &statusData)
-		if err != nil {
-			return nil, err
-		}
-
-		status := statusData.Status
-		if status == "" {
-			return nil, fmt.Errorf("invalid status in response")
-		}
-
-		if status == "completed" {
-			if statusData.Data != nil {
-				return statusData.Data, nil
+		if app.Version == "v0" {
+			var statusData JobStatusResponseV0
+			err = json.Unmarshal(resp, &statusData)
+			if err != nil {
+				return nil, err
 			}
-			attempts++
-			if attempts > 3 {
-				return nil, fmt.Errorf("crawl job completed but no data was returned")
+
+			status := statusData.Status
+			if status == "" {
+				return nil, fmt.Errorf("invalid status in response")
 			}
-		} else if status == "active" || status == "paused" || status == "pending" || status == "queued" || status == "waiting" {
-			pollInterval = max(pollInterval, 2)
-			time.Sleep(time.Duration(pollInterval) * time.Second)
-		} else {
-			return nil, fmt.Errorf("crawl job failed or was stopped. Status: %s", status)
+
+			if status == "completed" {
+				if statusData.Data != nil {
+					return statusData.Data, nil
+				}
+				attempts++
+				if attempts > 3 {
+					return nil, fmt.Errorf("crawl job completed but no data was returned")
+				}
+			} else if status == "active" || status == "paused" || status == "pending" || status == "queued" || status == "waiting" || status == "scraping" {
+				pollInterval = max(pollInterval, 2)
+				time.Sleep(time.Duration(pollInterval) * time.Second)
+			} else {
+				return nil, fmt.Errorf("crawl job failed or was stopped. Status: %s", status)
+			}
+
+		} else if app.Version == "v1" {
+			var statusData CrawlStatusResponse
+			err = json.Unmarshal(resp, &statusData)
+			if err != nil {
+				return nil, err
+			}
+
+			status := statusData.Status
+			if status == "" {
+				return nil, fmt.Errorf("invalid status in response")
+			}
+
+			if status == "completed" {
+				if statusData.Data != nil {
+					return statusData, nil
+				}
+				attempts++
+				if attempts > 3 {
+					return nil, fmt.Errorf("crawl job completed but no data was returned")
+				}
+			} else if status == "active" || status == "paused" || status == "pending" || status == "queued" || status == "waiting" || status == "scraping" {
+				pollInterval = max(pollInterval, 2)
+				time.Sleep(time.Duration(pollInterval) * time.Second)
+			} else {
+				return nil, fmt.Errorf("crawl job failed or was stopped. Status: %s", status)
+			}
 		}
 	}
 }
