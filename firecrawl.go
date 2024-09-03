@@ -101,6 +101,7 @@ type JobStatusResponse struct {
 	CurrentStep string               `json:"current_step,omitempty"`
 	Total       int                  `json:"total,omitempty"`
 	JobID       string               `json:"jobId,omitempty"`
+	Next        *string              `json:"next,omitempty"`
 	Data        []*FirecrawlDocument `json:"data,omitempty"`
 	PartialData []*FirecrawlDocument `json:"partial_data,omitempty"`
 }
@@ -527,14 +528,38 @@ func (app *FirecrawlApp) monitorJobStatus(jobID string, headers map[string]strin
 		if status == "" {
 			return nil, fmt.Errorf("invalid status in response")
 		}
-
 		if status == "completed" {
 			if statusData.Data != nil {
-				return statusData.Data, nil
-			}
-			attempts++
-			if attempts > 3 {
-				return nil, fmt.Errorf("crawl job completed but no data was returned")
+				allData := statusData.Data
+				for statusData.Next != nil {
+					resp, err := app.makeRequest(
+						http.MethodGet,
+						*statusData.Next,
+						nil,
+						headers,
+						"fetch next page of crawl status",
+						withRetries(3),
+						withBackoff(500),
+					)
+					if err != nil {
+						return nil, err
+					}
+
+					err = json.Unmarshal(resp, &statusData)
+					if err != nil {
+						return nil, err
+					}
+
+					if statusData.Data != nil {
+						allData = append(allData, statusData.Data...)
+					}
+				}
+				return allData, nil
+			} else {
+				attempts++
+				if attempts > 3 {
+					return nil, fmt.Errorf("crawl job completed but no data was returned")
+				}
 			}
 		} else if status == "active" || status == "paused" || status == "pending" || status == "queued" || status == "waiting" {
 			pollInterval = max(pollInterval, 2)
