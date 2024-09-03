@@ -34,26 +34,27 @@ func main() {
 	}
 
 	// Scrape a single URL
-	url := "https://mendable.ai"
-	scrapedData, err := app.ScrapeURL(url, nil)
+	scrapeResult, err := app.ScrapeURL("example.com", nil)
 	if err != nil {
-		log.Fatalf("Error occurred while scraping: %v", err)
+		log.Fatalf("Failed to scrape URL: %v", err)
 	}
-	fmt.Println(scrapedData)
+	fmt.Println(scrapeResult.Markdown)
 
 	// Crawl a website
-	crawlUrl := "https://mendable.ai"
-	params := map[string]any{
-		"pageOptions": map[string]any{
-			"onlyMainContent": true,
-		},
+	idempotencyKey := uuid.New().String() // optional idempotency key
+	crawlParams := &firecrawl.CrawlParams{
+		ExcludePaths: []string{"blog/*"},
+		MaxDepth:     prt(2),
 	}
-
-	crawlResult, err := app.CrawlURL(crawlUrl, params)
+	crawlResult, err := app.CrawlURL("example.com", crawlParams, &idempotencyKey)
 	if err != nil {
-		log.Fatalf("Error occurred while crawling: %v", err)
+		log.Fatalf("Failed to crawl URL: %v", err)
 	}
-	fmt.Println(crawlResult)
+	jsonCrawlResult, err := json.MarshalIndent(crawlResult, "", "  ")
+	if err != nil {
+		log.Fatalf("Failed to marshal crawl result: %v", err)
+	}
+	fmt.Println(string(jsonCrawlResult))
 }
 ```
 
@@ -62,7 +63,7 @@ func main() {
 To scrape a single URL with error handling, use the `ScrapeURL` method. It takes the URL as a parameter and returns the scraped data as a dictionary.
 
 ```go
-url := "https://mendable.ai"
+url := "https://example.com"
 scrapedData, err := app.ScrapeURL(url, nil)
 if err != nil {
 	log.Fatalf("Failed to scrape URL: %v", err)
@@ -111,48 +112,41 @@ if err != nil {
 fmt.Println(scrapeResult)
 ```
 
-### Search for a query
-
-To search the web, get the most relevant results, scrap each page and return the markdown, use the `Search` method. The method takes the query as a parameter and returns the search results.
-
-
-```go
-query := "what is mendable?"
-searchResult, err := app.Search(query)
-if err != nil {
-	log.Fatalf("Failed to search: %v", err)
-}
-fmt.Println(searchResult)
-```
-
 ### Crawling a Website
 
 To crawl a website, use the `CrawlUrl` method. It takes the starting URL and optional parameters as arguments. The `params` argument allows you to specify additional options for the crawl job, such as the maximum number of pages to crawl, allowed domains, and the output format.
 
 ```go
-crawlParams := map[string]any{
-	"crawlerOptions": map[string]any{
-		"excludes": []string{"blog/*"},
-		"includes": []string{}, // leave empty for all pages
-		"limit": 1000,
-	},
-	"pageOptions": map[string]any{
-		"onlyMainContent": true,
-	},
-}
-crawlResult, err := app.CrawlURL("mendable.ai", crawlParams, true, 2, idempotencyKey)
+response, err := app.CrawlURL("https://roastmywebsite.ai", nil,nil)
+
 if err != nil {
-	log.Fatalf("Failed to crawl URL: %v", err)
+ log.Fatalf("Failed to crawl URL: %v", err)
 }
-fmt.Println(crawlResult)
+
+fmt.Println(response)
 ```
+
+### Asynchronous Crawl
+
+To initiate an asynchronous crawl of a website, utilize the `AsyncCrawlURL` method. This method requires the starting URL and optional parameters as inputs. The `params` argument enables you to define various settings for the asynchronous crawl, such as the maximum number of pages to crawl, permitted domains, and the output format. Upon successful initiation, this method returns an ID, which is essential for subsequently checking the status of the crawl.
+
+```go
+response, err := app.AsyncCrawlURL("https://roastmywebsite.ai", nil, nil)
+
+if err != nil {
+  log.Fatalf("Failed to crawl URL: %v", err)
+}
+
+fmt.Println(response) 
+```
+
 
 ### Checking Crawl Status
 
-To check the status of a crawl job, use the `CheckCrawlStatus` method. It takes the job ID as a parameter and returns the current status of the crawl job.
+To check the status of a crawl job, use the `CheckCrawlStatus` method. It takes the crawl ID as a parameter and returns the current status of the crawl job.
 
 ```go
-status, err := app.CheckCrawlStatus(jobId)
+status, err := app.CheckCrawlStatus(id)
 if err != nil {
 	log.Fatalf("Failed to check crawl status: %v", err)
 }
