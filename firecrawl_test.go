@@ -1,6 +1,7 @@
 package firecrawl
 
 import (
+	"context"
 	"log"
 	"os"
 	"testing"
@@ -35,28 +36,39 @@ func TestNoAPIKey(t *testing.T) {
 }
 
 func TestScrapeURLInvalidAPIKey(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp("invalid_api_key", API_URL)
 	require.NoError(t, err)
 
-	_, err = app.ScrapeURL("https://firecrawl.dev", nil)
+	_, err = app.ScrapeURL(ctx, "https://firecrawl.dev", nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Unexpected error during scrape URL: Status code 401. Unauthorized: Invalid token")
+	assert.Contains(
+		t,
+		err.Error(),
+		"Unexpected error during scrape URL: Status code 401. Unauthorized: Invalid token",
+	)
 }
 
 func TestBlocklistedURL(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	_, err = app.ScrapeURL("https://facebook.com/fake-test", nil)
+	_, err = app.ScrapeURL(ctx, "https://facebook.com/fake-test", nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "URL is blocked. Firecrawl currently does not support social media scraping due to policy restrictions.")
+	assert.Contains(
+		t,
+		err.Error(),
+		"URL is blocked. Firecrawl currently does not support social media scraping due to policy restrictions.",
+	)
 }
 
 func TestSuccessfulResponseWithValidPreviewToken(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp("this_is_just_a_preview_token", API_URL)
 	require.NoError(t, err)
 
-	response, err := app.ScrapeURL("https://roastmywebsite.ai", nil)
+	response, err := app.ScrapeURL(ctx, "https://roastmywebsite.ai", nil)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -64,10 +76,11 @@ func TestSuccessfulResponseWithValidPreviewToken(t *testing.T) {
 }
 
 func TestScrapeURLE2E(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	response, err := app.ScrapeURL("https://roastmywebsite.ai", nil)
+	response, err := app.ScrapeURL(ctx, "https://roastmywebsite.ai", nil)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -78,6 +91,7 @@ func TestScrapeURLE2E(t *testing.T) {
 }
 
 func TestSuccessfulResponseWithValidAPIKeyAndIncludeHTML(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
@@ -91,7 +105,7 @@ func TestSuccessfulResponseWithValidAPIKeyAndIncludeHTML(t *testing.T) {
 		WaitFor:         ptr(1000),
 	}
 
-	response, err := app.ScrapeURL("https://roastmywebsite.ai", &params)
+	response, err := app.ScrapeURL(ctx, "https://roastmywebsite.ai", &params)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -108,52 +122,73 @@ func TestSuccessfulResponseWithValidAPIKeyAndIncludeHTML(t *testing.T) {
 }
 
 func TestSuccessfulResponseForValidScrapeWithPDFFile(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	response, err := app.ScrapeURL("https://arxiv.org/pdf/astro-ph/9301001.pdf", nil)
+	response, err := app.ScrapeURL(ctx, "https://arxiv.org/pdf/astro-ph/9301001.pdf", nil)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
-	assert.Contains(t, response.Markdown, "We present spectrophotometric observations of the Broad Line Radio Galaxy")
+	assert.Contains(
+		t,
+		response.Markdown,
+		"We present spectrophotometric observations of the Broad Line Radio Galaxy",
+	)
 	assert.NotNil(t, response.Metadata)
 }
 
 func TestSuccessfulResponseForValidScrapeWithPDFFileWithoutExplicitExtension(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	response, err := app.ScrapeURL("https://arxiv.org/pdf/astro-ph/9301001", nil)
+	response, err := app.ScrapeURL(ctx, "https://arxiv.org/pdf/astro-ph/9301001", nil)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
-	assert.Contains(t, response.Markdown, "We present spectrophotometric observations of the Broad Line Radio Galaxy")
+	assert.Contains(
+		t,
+		response.Markdown,
+		"We present spectrophotometric observations of the Broad Line Radio Galaxy",
+	)
 	assert.NotNil(t, response.Metadata)
 }
 
 func TestCrawlURLInvalidAPIKey(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp("invalid_api_key", API_URL)
 	require.NoError(t, err)
 
-	_, err = app.CrawlURL("https://firecrawl.dev", nil, nil)
+	_, err = app.CrawlURL(ctx, "https://firecrawl.dev", nil, nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Unexpected error during start crawl job: Status code 401. Unauthorized: Invalid token")
+	assert.Contains(
+		t,
+		err.Error(),
+		"Unexpected error during start crawl job: Status code 401. Unauthorized: Invalid token",
+	)
 }
 
 func TestShouldReturnErrorForBlocklistedURL(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	_, err = app.CrawlURL("https://twitter.com/fake-test", nil, nil)
+	_, err = app.CrawlURL(ctx, "https://twitter.com/fake-test", nil, nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "URL is blocked. Firecrawl currently does not support social media scraping due to policy restrictions.")
+	assert.Contains(
+		t,
+		err.Error(),
+		"URL is blocked. Firecrawl currently does not support social media scraping due to policy restrictions.",
+	)
 }
 
 func TestCrawlURLE2E(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	response, err := app.CrawlURL("https://roastmywebsite.ai", nil, nil)
+	response, err := app.CrawlURL(ctx, "https://roastmywebsite.ai", nil, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -172,10 +207,11 @@ func TestCrawlURLE2E(t *testing.T) {
 }
 
 func TestCrawlURLWithOptionsE2E(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	response, err := app.CrawlURL("https://roastmywebsite.ai",
+	response, err := app.CrawlURL(ctx, "https://roastmywebsite.ai",
 		&CrawlParams{
 			ExcludePaths:       []string{"blog/*"},
 			IncludePaths:       []string{"/"},
@@ -225,6 +261,7 @@ func TestCrawlURLWithOptionsE2E(t *testing.T) {
 }
 
 func TestCrawlURLWithIdempotencyKeyE2E(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
@@ -232,7 +269,7 @@ func TestCrawlURLWithIdempotencyKeyE2E(t *testing.T) {
 	params := &CrawlParams{
 		ExcludePaths: []string{"blog/*"},
 	}
-	response, err := app.CrawlURL("https://roastmywebsite.ai", params, &uniqueIdempotencyKey)
+	response, err := app.CrawlURL(ctx, "https://roastmywebsite.ai", params, &uniqueIdempotencyKey)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -241,16 +278,21 @@ func TestCrawlURLWithIdempotencyKeyE2E(t *testing.T) {
 	require.IsType(t, []*FirecrawlDocument{}, data)
 	assert.Contains(t, data[0].Markdown, "_Roast_")
 
-	_, err = app.CrawlURL("https://firecrawl.dev", params, &uniqueIdempotencyKey)
+	_, err = app.CrawlURL(ctx, "https://firecrawl.dev", params, &uniqueIdempotencyKey)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Conflict: Failed to start crawl job due to a conflict. Idempotency key already used")
+	assert.Contains(
+		t,
+		err.Error(),
+		"Conflict: Failed to start crawl job due to a conflict. Idempotency key already used",
+	)
 }
 
 func TestAsyncCrawlURLE2E(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	response, err := app.AsyncCrawlURL("https://roastmywebsite.ai", nil, nil)
+	response, err := app.AsyncCrawlURL(ctx, "https://roastmywebsite.ai", nil, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -260,10 +302,11 @@ func TestAsyncCrawlURLE2E(t *testing.T) {
 }
 
 func TestAsyncCrawlURLWithOptionsE2E(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	response, err := app.AsyncCrawlURL("https://roastmywebsite.ai",
+	response, err := app.AsyncCrawlURL(ctx, "https://roastmywebsite.ai",
 		&CrawlParams{
 			ExcludePaths:       []string{"blog/*"},
 			IncludePaths:       []string{"/"},
@@ -292,6 +335,7 @@ func TestAsyncCrawlURLWithOptionsE2E(t *testing.T) {
 }
 
 func TestAsyncCrawlURLWithIdempotencyKeyE2E(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
@@ -299,19 +343,29 @@ func TestAsyncCrawlURLWithIdempotencyKeyE2E(t *testing.T) {
 	params := &CrawlParams{
 		ExcludePaths: []string{"blog/*"},
 	}
-	response, err := app.AsyncCrawlURL("https://roastmywebsite.ai", params, &uniqueIdempotencyKey)
+	response, err := app.AsyncCrawlURL(
+		ctx,
+		"https://roastmywebsite.ai",
+		params,
+		&uniqueIdempotencyKey,
+	)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotNil(t, response.ID)
 	assert.NotNil(t, response.URL)
 	assert.True(t, response.Success)
 
-	_, err = app.AsyncCrawlURL("https://firecrawl.dev", params, &uniqueIdempotencyKey)
+	_, err = app.AsyncCrawlURL(ctx, "https://firecrawl.dev", params, &uniqueIdempotencyKey)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Conflict: Failed to start crawl job due to a conflict. Idempotency key already used")
+	assert.Contains(
+		t,
+		err.Error(),
+		"Conflict: Failed to start crawl job due to a conflict. Idempotency key already used",
+	)
 }
 
 func TestCheckCrawlStatusE2E(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
@@ -320,7 +374,7 @@ func TestCheckCrawlStatusE2E(t *testing.T) {
 			Formats: []string{"markdown", "html", "rawHtml", "screenshot", "links"},
 		},
 	}
-	asyncCrawlResponse, err := app.AsyncCrawlURL("https://firecrawl.dev", params, nil)
+	asyncCrawlResponse, err := app.AsyncCrawlURL(ctx, "https://firecrawl.dev", params, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, asyncCrawlResponse)
 
@@ -334,7 +388,7 @@ func TestCheckCrawlStatusE2E(t *testing.T) {
 
 		time.Sleep(5 * time.Second) // wait for 5 seconds
 
-		response, err := app.CheckCrawlStatus(asyncCrawlResponse.ID)
+		response, err := app.CheckCrawlStatus(ctx, asyncCrawlResponse.ID)
 		require.NoError(t, err)
 		assert.NotNil(t, response)
 
@@ -350,7 +404,7 @@ func TestCheckCrawlStatusE2E(t *testing.T) {
 	}
 
 	// Final check after loop or if completed
-	response, err := app.CheckCrawlStatus(asyncCrawlResponse.ID)
+	response, err := app.CheckCrawlStatus(ctx, asyncCrawlResponse.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -374,26 +428,37 @@ func TestCheckCrawlStatusE2E(t *testing.T) {
 }
 
 func TestMapURLInvalidAPIKey(t *testing.T) {
+	ctx := context.Background()
 	invalidApp, err := NewFirecrawlApp("invalid_api_key", API_URL)
 	require.NoError(t, err)
-	_, err = invalidApp.MapURL("https://roastmywebsite.ai", nil)
+	_, err = invalidApp.MapURL(ctx, "https://roastmywebsite.ai", nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Unexpected error during map: Status code 401. Unauthorized: Invalid token")
+	assert.Contains(
+		t,
+		err.Error(),
+		"Unexpected error during map: Status code 401. Unauthorized: Invalid token",
+	)
 }
 
 func TestMapURLBlocklistedURL(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 	blocklistedUrl := "https://facebook.com/fake-test"
-	_, err = app.MapURL(blocklistedUrl, nil)
+	_, err = app.MapURL(ctx, blocklistedUrl, nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Unexpected error during map: Status code 403. URL is blocked. Firecrawl currently does not support social media scraping due to policy restrictions.")
+	assert.Contains(
+		t,
+		err.Error(),
+		"Unexpected error during map: Status code 403. URL is blocked. Firecrawl currently does not support social media scraping due to policy restrictions.",
+	)
 }
 
 func TestMapURLValidPreviewToken(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp("this_is_just_a_preview_token", API_URL)
 	require.NoError(t, err)
-	response, err := app.MapURL("https://roastmywebsite.ai", nil)
+	response, err := app.MapURL(ctx, "https://roastmywebsite.ai", nil)
 	require.NoError(t, err)
 
 	assert.NotNil(t, response)
@@ -404,10 +469,11 @@ func TestMapURLValidPreviewToken(t *testing.T) {
 }
 
 func TestMapURLValidMap(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	response, err := app.MapURL("https://roastmywebsite.ai", nil)
+	response, err := app.MapURL(ctx, "https://roastmywebsite.ai", nil)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.IsType(t, &MapResponse{}, response)
@@ -417,10 +483,11 @@ func TestMapURLValidMap(t *testing.T) {
 }
 
 func TestMapURLWithSearchParameter(t *testing.T) {
+	ctx := context.Background()
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	_, err = app.Search("https://roastmywebsite.ai", nil)
+	_, err = app.Search(ctx, "https://roastmywebsite.ai", nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Search is not implemented in API version 1.0.0")
 }
