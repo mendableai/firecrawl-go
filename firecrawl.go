@@ -12,11 +12,11 @@ import (
 	"time"
 )
 
-// RobotsField is a custom type for the robots field in the metadata.
-type RobotsField []string
+// StringOrArrayField is a custom type for fields in the metadata.
+type StringOrArrayField []string
 
-// UnmarshalJSON is a custom unmarshaller for the RobotsField type.
-func (r *RobotsField) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON is a custom unmarshaller for the StringOrArrayField type.
+func (r *StringOrArrayField) UnmarshalJSON(data []byte) error {
 	var single string
 	if err := json.Unmarshal(data, &single); err == nil {
 		*r = []string{single}
@@ -29,43 +29,45 @@ func (r *RobotsField) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	return fmt.Errorf("robots field is neither a string nor a list of strings")
+	return fmt.Errorf("metadata field is neither a string nor a list of strings")
 }
 
 // FirecrawlDocumentMetadata represents metadata for a Firecrawl document
 type FirecrawlDocumentMetadata struct {
-	Title             *string      `json:"title,omitempty"`
-	Description       *string      `json:"description,omitempty"`
-	Language          *string      `json:"language,omitempty"`
-	Keywords          *string      `json:"keywords,omitempty"`
-	Robots            *RobotsField `json:"robots,omitempty"`
-	OGTitle           *string      `json:"ogTitle,omitempty"`
-	OGDescription     *string      `json:"ogDescription,omitempty"`
-	OGURL             *string      `json:"ogUrl,omitempty"`
-	OGImage           *string      `json:"ogImage,omitempty"`
-	OGAudio           *string      `json:"ogAudio,omitempty"`
-	OGDeterminer      *string      `json:"ogDeterminer,omitempty"`
-	OGLocale          *string      `json:"ogLocale,omitempty"`
-	OGLocaleAlternate []*string    `json:"ogLocaleAlternate,omitempty"`
-	OGSiteName        *string      `json:"ogSiteName,omitempty"`
-	OGVideo           *string      `json:"ogVideo,omitempty"`
-	DCTermsCreated    *string      `json:"dctermsCreated,omitempty"`
-	DCDate            *string      `json:"dcDate,omitempty"`
-	DCTermsType       *string      `json:"dctermsType,omitempty"`
-	DCDateCreated     *string      `json:"dcDateCreated,omitempty"`
-	DCType            *string      `json:"dcType,omitempty"`
-	DCTermsAudience   *string      `json:"dctermsAudience,omitempty"`
-	DCTermsSubject    *string      `json:"dctermsSubject,omitempty"`
-	DCSubject         *string      `json:"dcSubject,omitempty"`
-	DCDescription     *string      `json:"dcDescription,omitempty"`
-	DCTermsKeywords   *string      `json:"dctermsKeywords,omitempty"`
-	ModifiedTime      *string      `json:"modifiedTime,omitempty"`
-	PublishedTime     *string      `json:"publishedTime,omitempty"`
-	ArticleTag        *string      `json:"articleTag,omitempty"`
-	ArticleSection    *string      `json:"articleSection,omitempty"`
-	SourceURL         *string      `json:"sourceURL,omitempty"`
-	StatusCode        *int         `json:"statusCode,omitempty"`
-	Error             *string      `json:"error,omitempty"`
+	Title             *StringOrArrayField	`json:"title,omitempty"`
+	Description       *StringOrArrayField	`json:"description,omitempty"`
+	Language          *StringOrArrayField	`json:"language,omitempty"`
+	Keywords          *StringOrArrayField	`json:"keywords,omitempty"`
+	Robots            *StringOrArrayField 	`json:"robots,omitempty"`
+	OGTitle           *StringOrArrayField	`json:"ogTitle,omitempty"`
+	OGDescription     *StringOrArrayField	`json:"ogDescription,omitempty"`
+	OGURL             *StringOrArrayField	`json:"ogUrl,omitempty"`
+	OGImage           *StringOrArrayField	`json:"ogImage,omitempty"`
+	OGAudio           *StringOrArrayField	`json:"ogAudio,omitempty"`
+	OGDeterminer      *StringOrArrayField	`json:"ogDeterminer,omitempty"`
+	OGLocale          *StringOrArrayField	`json:"ogLocale,omitempty"`
+	OGLocaleAlternate *StringOrArrayField    `json:"ogLocaleAlternate,omitempty"`
+	OGSiteName        *StringOrArrayField	`json:"ogSiteName,omitempty"`
+	OGVideo           *StringOrArrayField	`json:"ogVideo,omitempty"`
+	DCTermsCreated    *StringOrArrayField	`json:"dctermsCreated,omitempty"`
+	DCDate            *StringOrArrayField	`json:"dcDate,omitempty"`
+	DCTermsType       *StringOrArrayField	`json:"dctermsType,omitempty"`
+	DCDateCreated     *StringOrArrayField	`json:"dcDateCreated,omitempty"`
+	DCType            *StringOrArrayField	`json:"dcType,omitempty"`
+	DCTermsAudience   *StringOrArrayField	`json:"dctermsAudience,omitempty"`
+	DCTermsSubject    *StringOrArrayField	`json:"dctermsSubject,omitempty"`
+	DCSubject         *StringOrArrayField	`json:"dcSubject,omitempty"`
+	DCDescription     *StringOrArrayField	`json:"dcDescription,omitempty"`
+	DCTermsKeywords   *StringOrArrayField	`json:"dctermsKeywords,omitempty"`
+	ModifiedTime      *StringOrArrayField	`json:"modifiedTime,omitempty"`
+	PublishedTime     *StringOrArrayField	`json:"publishedTime,omitempty"`
+	ArticleTag        *StringOrArrayField	`json:"articleTag,omitempty"`
+	ArticleSection    *StringOrArrayField	`json:"articleSection,omitempty"`
+	SourceURL         *string      			`json:"sourceURL,omitempty"`
+	URL               *string      			`json:"url,omitempty"`
+    ScrapeID          *string      			`json:"scrapeId,omitempty"` 
+	StatusCode        *int         			`json:"statusCode,omitempty"`
+	Error             *string      			`json:"error,omitempty"`
 }
 
 // FirecrawlDocument represents a document in Firecrawl
