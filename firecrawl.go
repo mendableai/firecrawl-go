@@ -650,18 +650,18 @@ func (app *FirecrawlApp) makeRequest(method, url string, data map[string]any, he
 		}
 	}
 
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, err
-	}
-
-	for key, value := range headers {
-		req.Header.Set(key, value)
-	}
-
 	var resp *http.Response
 	options := newRequestOptions(opts...)
 	for i := 0; i < options.retries; i++ {
+		req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
+		if err != nil {
+			return nil, err
+		}
+
+		for key, value := range headers {
+			req.Header.Set(key, value)
+		}
+
 		resp, err = app.Client.Do(req)
 		if err != nil {
 			return nil, err
