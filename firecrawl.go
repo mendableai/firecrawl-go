@@ -666,14 +666,21 @@ func (app *FirecrawlApp) makeRequest(method, url string, data map[string]any, he
 		if err != nil {
 			return nil, err
 		}
-		defer resp.Body.Close()
 
 		if resp.StatusCode != 502 {
 			break
 		}
 
+		// close the response body on each attempt
+		// this is important to avoid resource leaks
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+
 		time.Sleep(time.Duration(math.Pow(2, float64(i))) * time.Duration(options.backoff) * time.Millisecond)
 	}
+
+	// close the response body for the last attempt
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
