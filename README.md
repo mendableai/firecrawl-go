@@ -7,7 +7,7 @@ The Firecrawl Go SDK is a library that allows you to easily scrape and crawl web
 To install the Firecrawl Go SDK, you can
 
 ```bash
-go get github.com/mendableai/firecrawl-go/v2
+go get github.com/mendableai/firecrawl-go
 ```
 
 ## Usage
@@ -19,19 +19,16 @@ go get github.com/mendableai/firecrawl-go/v2
 Here's an example of how to use the SDK with error handling:
 
 ```go
-package main
-
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 
-	"github.com/mendableai/firecrawl-go/v2"
+	"github.com/mendableai/firecrawl-go"
 )
 
 func main() {
-	// Initialize the FirecrawlApp with your API key and optional URL
-	app, err := firecrawl.NewFirecrawlApp("YOUR_API_KEY", "YOUR_API_URL")
+	// Initialize the FirecrawlApp with your API key
+	app, err := firecrawl.NewFirecrawlApp("YOUR_API_KEY")
 	if err != nil {
 		log.Fatalf("Failed to initialize FirecrawlApp: %v", err)
 	}
@@ -44,7 +41,7 @@ func main() {
 	fmt.Println(scrapeResult.Markdown)
 
 	// Crawl a website
-	idempotencyKey := "idempotency-key" // optional idempotency key
+	idempotencyKey := uuid.New().String() // optional idempotency key
 	crawlParams := &firecrawl.CrawlParams{
 		ExcludePaths: []string{"blog/*"},
 		MaxDepth:     prt(2),

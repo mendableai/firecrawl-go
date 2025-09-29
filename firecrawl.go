@@ -3,6 +3,7 @@ package firecrawl
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -159,6 +160,47 @@ type MapResponse struct {
 	Error   string   `json:"error,omitempty"`
 }
 
+// SearchParams represents the parameters for a search request.
+type SearchParams struct {
+	Limit         int          `json:"limit"`
+	TimeBased     string       `json:"tbs"`
+	Lang          string       `json:"lang"`
+	Country       string       `json:"country"`
+	Location      string       `json:"location"`
+	Timeout       int          `json:"timeout"`
+	ScrapeOptions ScrapeParams `json:"scrapeOptions"`
+}
+
+// SearchMetadata represents metadata for a search result
+type SearchMetadata struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	SourceURL   string `json:"sourceURL"`
+	StatusCode  int    `json:"statusCode"`
+	Error       string `json:"error"`
+}
+
+// SearchDocument represents a document in search results
+type SearchDocument struct {
+	Title       string         `json:"title"`
+	Description string         `json:"description"`
+	URL         string         `json:"url"`
+	Markdown    string         `json:"markdown"`
+	HTML        string         `json:"html"`
+	RawHTML     string         `json:"rawHtml"`
+	Links       []string       `json:"links"`
+	Screenshot  string         `json:"screenshot"`
+	Metadata    SearchMetadata `json:"metadata"`
+}
+
+// SearchResponse represents the response for search operations
+type SearchResponse struct {
+	Success bool             `json:"success"`
+	Error   string           `json:"error,omitempty"`
+	Warning string           `json:"warning,omitempty"`
+	Data    []SearchDocument `json:"data,omitempty"`
+}
+
 // requestOptions represents options for making requests.
 type requestOptions struct {
 	retries int
@@ -217,6 +259,30 @@ type FirecrawlApp struct {
 	Version string
 }
 
+// FirecrawlOption is a functional option type for FirecrawlApp.
+type FirecrawlOption func(*FirecrawlApp)
+
+// WithVersion sets the API version for the Firecrawl client.
+func WithVersion(version string) FirecrawlOption {
+	return func(app *FirecrawlApp) {
+		app.Version = version
+	}
+}
+
+// WithClient sets the HTTP client for the Firecrawl client.
+func WithClient(client *http.Client) FirecrawlOption {
+	return func(app *FirecrawlApp) {
+		app.Client = client
+	}
+}
+
+// WithTimeout sets the timeout for the HTTP client.
+func WithTimeout(timeout time.Duration) FirecrawlOption {
+	return func(app *FirecrawlApp) {
+		app.Client.Timeout = timeout
+	}
+}
+
 // NewFirecrawlApp creates a new instance of FirecrawlApp with the provided API key and API URL.
 // If the API key or API URL is not provided, it attempts to retrieve them from environment variables.
 // If the API key is still not found, it returns an error.
@@ -229,11 +295,12 @@ type FirecrawlApp struct {
 // Returns:
 //   - *FirecrawlApp: A new instance of FirecrawlApp configured with the provided or retrieved API key and API URL.
 //   - error: An error if the API key is not provided or retrieved.
-func NewFirecrawlApp(apiKey, apiURL string, timeout ...time.Duration) (*FirecrawlApp, error) {
+func NewFirecrawlApp(apiKey, apiURL string, opts ...FirecrawlOption) (*FirecrawlApp, error) {
 	if apiKey == "" {
 		apiKey = os.Getenv("FIRECRAWL_API_KEY")
 		if apiKey == "" {
-			return nil, fmt.Errorf("no API key provided")
+			fmt.Println("no API key provided")
+			// return nil, fmt.Errorf("no API key provided")
 		}
 	}
 
@@ -244,21 +311,21 @@ func NewFirecrawlApp(apiKey, apiURL string, timeout ...time.Duration) (*Firecraw
 		}
 	}
 
-	t := 120 * time.Second // default
-	if len(timeout) > 0 {
-		t = timeout[0]
-	}
-
-	client := &http.Client{
-		Timeout:   t,
-		Transport: http.DefaultTransport,
-	}
-
-	return &FirecrawlApp{
+	fca := &FirecrawlApp{
 		APIKey: apiKey,
 		APIURL: apiURL,
-		Client: client,
-	}, nil
+		Client: &http.Client{
+			Timeout: 60 * time.Second, // default timeout
+      Transport: http.DefaultTransport,
+		},
+	}
+
+	// Apply any custom options
+	for _, opt := range opts {
+		opt(fca)
+	}
+
+	return fca, nil
 }
 
 // ScrapeURL scrapes the content of the specified URL using the Firecrawl API.
@@ -271,6 +338,11 @@ func NewFirecrawlApp(apiKey, apiURL string, timeout ...time.Duration) (*Firecraw
 //   - *FirecrawlDocument or *FirecrawlDocumentV0: The scraped document data depending on the API version.
 //   - error: An error if the scrape request fails.
 func (app *FirecrawlApp) ScrapeURL(url string, params *ScrapeParams) (*FirecrawlDocument, error) {
+	return app.ScrapeURLWithContext(context.Background(), url, params)
+}
+
+// ScrapeURLWithContext scrapes the content of the specified URL using the Firecrawl API. See ScrapeURL for more information.
+func (app *FirecrawlApp) ScrapeURLWithContext(ctx context.Context, url string, params *ScrapeParams) (*FirecrawlDocument, error) {
 	headers := app.prepareHeaders(nil)
 	scrapeBody := map[string]any{"url": url}
 
@@ -326,6 +398,7 @@ func (app *FirecrawlApp) ScrapeURL(url string, params *ScrapeParams) (*Firecrawl
 	}
 
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodPost,
 		fmt.Sprintf("%s/v1/scrape", app.APIURL),
 		scrapeBody,
@@ -362,6 +435,11 @@ func (app *FirecrawlApp) ScrapeURL(url string, params *ScrapeParams) (*Firecrawl
 //   - CrawlStatusResponse: The crawl result if the job is completed.
 //   - error: An error if the crawl request fails.
 func (app *FirecrawlApp) CrawlURL(url string, params *CrawlParams, idempotencyKey *string, pollInterval ...int) (*CrawlStatusResponse, error) {
+	return app.CrawlURLWithContext(context.Background(), url, params, idempotencyKey, pollInterval...)
+}
+
+// CrawlURLWithContext starts a crawl job for the specified URL using the Firecrawl API. See CrawlURL for more information.
+func (app *FirecrawlApp) CrawlURLWithContext(ctx context.Context, url string, params *CrawlParams, idempotencyKey *string, pollInterval ...int) (*CrawlStatusResponse, error) {
 	var key string
 	if idempotencyKey != nil {
 		key = *idempotencyKey
@@ -409,6 +487,7 @@ func (app *FirecrawlApp) CrawlURL(url string, params *CrawlParams, idempotencyKe
 	}
 
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodPost,
 		fmt.Sprintf("%s/v1/crawl", app.APIURL),
 		crawlBody,
@@ -427,7 +506,7 @@ func (app *FirecrawlApp) CrawlURL(url string, params *CrawlParams, idempotencyKe
 		return nil, err
 	}
 
-	return app.monitorJobStatus(crawlResponse.ID, headers, actualPollInterval)
+	return app.monitorJobStatus(ctx, crawlResponse.ID, headers, actualPollInterval)
 }
 
 // CrawlURL starts a crawl job for the specified URL using the Firecrawl API.
@@ -441,6 +520,11 @@ func (app *FirecrawlApp) CrawlURL(url string, params *CrawlParams, idempotencyKe
 //   - *CrawlResponse: The crawl response with id.
 //   - error: An error if the crawl request fails.
 func (app *FirecrawlApp) AsyncCrawlURL(url string, params *CrawlParams, idempotencyKey *string) (*CrawlResponse, error) {
+	return app.AsyncCrawlURLWithContext(context.Background(), url, params, idempotencyKey)
+}
+
+// AsyncCrawlURLWithContext starts a crawl job for the specified URL using the Firecrawl API. See AsyncCrawlURL for more information.
+func (app *FirecrawlApp) AsyncCrawlURLWithContext(ctx context.Context, url string, params *CrawlParams, idempotencyKey *string) (*CrawlResponse, error) {
 	var key string
 	if idempotencyKey != nil {
 		key = *idempotencyKey
@@ -483,6 +567,7 @@ func (app *FirecrawlApp) AsyncCrawlURL(url string, params *CrawlParams, idempote
 	}
 
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodPost,
 		fmt.Sprintf("%s/v1/crawl", app.APIURL),
 		crawlBody,
@@ -518,10 +603,16 @@ func (app *FirecrawlApp) AsyncCrawlURL(url string, params *CrawlParams, idempote
 //   - *CrawlStatusResponse: The status of the crawl job.
 //   - error: An error if the crawl status check request fails.
 func (app *FirecrawlApp) CheckCrawlStatus(ID string) (*CrawlStatusResponse, error) {
+	return app.CheckCrawlStatusWithContext(context.Background(), ID)
+}
+
+// CheckCrawlStatusWithContext checks the status of a crawl job using the Firecrawl API. See CheckCrawlStatus for more information.
+func (app *FirecrawlApp) CheckCrawlStatusWithContext(ctx context.Context, ID string) (*CrawlStatusResponse, error) {
 	headers := app.prepareHeaders(nil)
 	apiURL := fmt.Sprintf("%s/v1/crawl/%s", app.APIURL, ID)
 
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodGet,
 		apiURL,
 		nil,
@@ -552,9 +643,15 @@ func (app *FirecrawlApp) CheckCrawlStatus(ID string) (*CrawlStatusResponse, erro
 //   - string: The status of the crawl job after cancellation.
 //   - error: An error if the crawl job cancellation request fails.
 func (app *FirecrawlApp) CancelCrawlJob(ID string) (string, error) {
+	return app.CancelCrawlJobWithContext(context.Background(), ID)
+}
+
+// CancelCrawlJobWithContext cancels a crawl job using the Firecrawl API. See CancelCrawlJob for more information.
+func (app *FirecrawlApp) CancelCrawlJobWithContext(ctx context.Context, ID string) (string, error) {
 	headers := app.prepareHeaders(nil)
 	apiURL := fmt.Sprintf("%s/v1/crawl/%s", app.APIURL, ID)
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodDelete,
 		apiURL,
 		nil,
@@ -584,6 +681,9 @@ func (app *FirecrawlApp) CancelCrawlJob(ID string) (string, error) {
 //   - *MapResponse: The response from the mapping operation.
 //   - error: An error if the mapping request fails.
 func (app *FirecrawlApp) MapURL(url string, params *MapParams) (*MapResponse, error) {
+	return app.MapURLWithContext(context.Background(), url, params)
+}
+func (app *FirecrawlApp) MapURLWithContext(ctx context.Context, url string, params *MapParams) (*MapResponse, error) {
 	headers := app.prepareHeaders(nil)
 	jsonData := map[string]any{"url": url}
 
@@ -603,6 +703,7 @@ func (app *FirecrawlApp) MapURL(url string, params *MapParams) (*MapResponse, er
 	}
 
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodPost,
 		fmt.Sprintf("%s/v1/map", app.APIURL),
 		jsonData,
@@ -629,13 +730,69 @@ func (app *FirecrawlApp) MapURL(url string, params *MapParams) (*MapResponse, er
 // SearchURL searches for a URL using the Firecrawl API.
 //
 // Parameters:
-//   - url: The URL to search for.
+//   - query: The search query.
 //   - params: Optional parameters for the search request.
 //   - error: An error if the search request fails.
-//
-// Search is not implemented in API version 1.0.0.
-func (app *FirecrawlApp) Search(query string, params *any) (any, error) {
-	return nil, fmt.Errorf("Search is not implemented in API version 1.0.0")
+func (app *FirecrawlApp) Search(query string, params *SearchParams) (*SearchResponse, error) {
+	return app.SearchWithContext(context.Background(), query, params)
+}
+
+// SearchURLWithContext searches for a URL using the Firecrawl API. See SearchURL for more information.
+func (app *FirecrawlApp) SearchWithContext(ctx context.Context, query string, params *SearchParams) (*SearchResponse, error) {
+	headers := app.prepareHeaders(nil)
+	jsonData := map[string]any{"query": query}
+	if params != nil {
+		if params.Limit != 0 {
+			if params.Limit < 1 || params.Limit > 10 {
+				return nil, fmt.Errorf("limit must be between 1 and 10")
+			}
+			jsonData["limit"] = params.Limit
+		}
+		if params.TimeBased != "" {
+			jsonData["tbs"] = params.TimeBased
+		}
+		if params.Lang != "" {
+			jsonData["lang"] = params.Lang
+		}
+		if params.Country != "" {
+			jsonData["country"] = params.Country
+		}
+		if params.Location != "" {
+			jsonData["location"] = params.Location
+		}
+		if params.Timeout != 0 {
+			jsonData["timeout"] = params.Timeout
+		}
+		if params.ScrapeOptions.Formats != nil {
+			jsonData["scrapeOptions"] = params.ScrapeOptions
+		}
+	}
+
+	resp, err := app.makeRequest(
+		ctx,
+		http.MethodPost,
+		fmt.Sprintf("%s/v1/search", app.APIURL),
+		jsonData,
+		headers,
+		"search",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var searchResponse SearchResponse
+	err = json.Unmarshal(resp, &searchResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	if searchResponse.Success {
+		return &searchResponse, nil
+	} else {
+		return nil, fmt.Errorf("search operation failed: %s", searchResponse.Error)
+	}
+
+	// return nil, fmt.Errorf("Search is not implemented in API version 1.0.0")
 }
 
 // prepareHeaders prepares the headers for an HTTP request.
@@ -670,7 +827,7 @@ func (app *FirecrawlApp) prepareHeaders(idempotencyKey *string) map[string]strin
 // Returns:
 //   - []byte: The response body from the request.
 //   - error: An error if the request fails.
-func (app *FirecrawlApp) makeRequest(method, url string, data map[string]any, headers map[string]string, action string, opts ...requestOption) ([]byte, error) {
+func (app *FirecrawlApp) makeRequest(ctx context.Context, method, url string, data map[string]any, headers map[string]string, action string, opts ...requestOption) ([]byte, error) {
 	var body []byte
 	var err error
 	if data != nil {
@@ -680,7 +837,7 @@ func (app *FirecrawlApp) makeRequest(method, url string, data map[string]any, he
 		}
 	}
 
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}
@@ -728,11 +885,12 @@ func (app *FirecrawlApp) makeRequest(method, url string, data map[string]any, he
 // Returns:
 //   - *CrawlStatusResponse: The crawl result if the job is completed.
 //   - error: An error if the crawl status check request fails.
-func (app *FirecrawlApp) monitorJobStatus(ID string, headers map[string]string, pollInterval int) (*CrawlStatusResponse, error) {
+func (app *FirecrawlApp) monitorJobStatus(ctx context.Context, ID string, headers map[string]string, pollInterval int) (*CrawlStatusResponse, error) {
 	attempts := 3
 
 	for {
 		resp, err := app.makeRequest(
+			ctx,
 			http.MethodGet,
 			fmt.Sprintf("%s/v1/crawl/%s", app.APIURL, ID),
 			nil,
@@ -760,6 +918,7 @@ func (app *FirecrawlApp) monitorJobStatus(ID string, headers map[string]string, 
 				allData := statusData.Data
 				for statusData.Next != nil {
 					resp, err := app.makeRequest(
+						ctx,
 						http.MethodGet,
 						*statusData.Next,
 						nil,

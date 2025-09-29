@@ -1,6 +1,8 @@
 package firecrawl
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -397,6 +399,280 @@ func TestMapURLWithSearchParameter(t *testing.T) {
 	_, err = app.Search("https://www.scrapethissite.com", nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Search is not implemented in API version 1.0.0")
+}
+
+func TestSearchE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	params := &SearchParams{
+		Limit: 3,
+		Lang:  "en",
+	}
+
+	response, err := app.Search("firecrawl", params)
+	require.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.True(t, response.Success)
+	assert.Greater(t, len(response.Data), 0)
+
+	// Verify the search results contain expected data
+	for _, result := range response.Data {
+		assert.NotEmpty(t, result.URL)
+		assert.NotEmpty(t, result.Title)
+		assert.NotEmpty(t, result.Description)
+	}
+}
+
+// Context-related tests
+func TestScrapeURLWithContextTimeout(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	// Test with a very short timeout that should cause the request to fail
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+	defer cancel()
+
+	// Wait a bit to ensure the context is already expired
+	time.Sleep(1 * time.Millisecond)
+
+	_, err = app.ScrapeURLWithContext(ctx, "https://roastmywebsite.ai", nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "context deadline exceeded")
+}
+
+func TestScrapeURLWithContextCancellation(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Start the request in a goroutine
+	var response *FirecrawlDocument
+	var requestErr error
+	done := make(chan bool)
+
+	go func() {
+		response, requestErr = app.ScrapeURLWithContext(ctx, "https://roastmywebsite.ai", nil)
+		done <- true
+	}()
+
+	// Cancel the context immediately
+	cancel()
+
+	// Wait for the goroutine to finish
+	<-done
+
+	assert.Error(t, requestErr)
+	assert.Contains(t, requestErr.Error(), "context canceled")
+	assert.Nil(t, response)
+}
+
+func TestScrapeURLWithContextSuccess(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	response, err := app.ScrapeURLWithContext(ctx, "https://roastmywebsite.ai", nil)
+	require.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.Contains(t, response.Markdown, "_Roast_")
+}
+
+func TestCrawlURLWithContextTimeout(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	// Test with a very short timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+	defer cancel()
+
+	// Wait a bit to ensure the context is already expired
+	time.Sleep(1 * time.Millisecond)
+
+	_, err = app.CrawlURLWithContext(ctx, "https://roastmywebsite.ai", nil, nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "context deadline exceeded")
+}
+
+func TestCrawlURLWithContextSuccess(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	// Use a small limit to make the test faster
+	params := &CrawlParams{
+		Limit: ptr(2),
+	}
+
+	response, err := app.CrawlURLWithContext(ctx, "https://roastmywebsite.ai", params, nil)
+	require.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.Equal(t, "completed", response.Status)
+	assert.Greater(t, len(response.Data), 0)
+}
+
+func TestAsyncCrawlURLWithContext(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	response, err := app.AsyncCrawlURLWithContext(ctx, "https://roastmywebsite.ai", nil, nil)
+	require.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.NotEmpty(t, response.ID)
+	assert.Contains(t, response.URL, "https://api.firecrawl.dev/v1/crawl/")
+}
+
+func TestCheckCrawlStatusWithContext(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	// First start an async crawl
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	crawlResponse, err := app.AsyncCrawlURLWithContext(ctx, "https://roastmywebsite.ai", nil, nil)
+	require.NoError(t, err)
+
+	// Check the status with context
+	statusResponse, err := app.CheckCrawlStatusWithContext(ctx, crawlResponse.ID)
+	require.NoError(t, err)
+	assert.NotNil(t, statusResponse)
+	assert.Contains(t, []string{"scraping", "completed"}, statusResponse.Status)
+}
+
+func TestCancelCrawlJobWithContext(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Start an async crawl
+	crawlResponse, err := app.AsyncCrawlURLWithContext(ctx, "https://roastmywebsite.ai", nil, nil)
+	require.NoError(t, err)
+
+	// Cancel the job
+	status, err := app.CancelCrawlJobWithContext(ctx, crawlResponse.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "cancelled", status)
+}
+
+func TestMapURLWithContext(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	response, err := app.MapURLWithContext(ctx, "https://roastmywebsite.ai", nil)
+	require.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.Greater(t, len(response.Links), 0)
+}
+
+func TestMapURLWithContextTimeout(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	// Test with a very short timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+	defer cancel()
+
+	// Wait a bit to ensure the context is already expired
+	time.Sleep(1 * time.Millisecond)
+
+	_, err = app.MapURLWithContext(ctx, "https://roastmywebsite.ai", nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "context deadline exceeded")
+}
+
+func TestSearchWithContext(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	params := &SearchParams{
+		Limit: 3,
+		Lang:  "en",
+	}
+
+	response, err := app.SearchWithContext(ctx, "firecrawl", params)
+	require.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.True(t, response.Success)
+	assert.Greater(t, len(response.Data), 0)
+}
+
+func TestSearchWithContextTimeout(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	// Test with a very short timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+	defer cancel()
+
+	// Wait a bit to ensure the context is already expired
+	time.Sleep(1 * time.Millisecond)
+
+	_, err = app.SearchWithContext(ctx, "firecrawl", nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "context deadline exceeded")
+}
+
+func TestContextWithValues(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	// Test that context values are preserved (though not used by the API)
+	ctx := context.WithValue(context.Background(), "test_key", "test_value")
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	response, err := app.ScrapeURLWithContext(ctx, "https://roastmywebsite.ai", nil)
+	require.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.Contains(t, response.Markdown, "_Roast_")
+
+	// Verify the context value is still there
+	assert.Equal(t, "test_value", ctx.Value("test_key"))
+}
+
+func TestConcurrentContextRequests(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	// Test multiple concurrent requests with different contexts
+	const numRequests = 3
+	results := make(chan error, numRequests)
+
+	for i := 0; i < numRequests; i++ {
+		go func(id int) {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			// Add a unique value to each context
+			ctx = context.WithValue(ctx, "request_id", fmt.Sprintf("req_%d", id))
+
+			_, err := app.ScrapeURLWithContext(ctx, "https://roastmywebsite.ai", nil)
+			results <- err
+		}(i)
+	}
+
+	// Wait for all requests to complete
+	for i := 0; i < numRequests; i++ {
+		err := <-results
+		assert.NoError(t, err)
+	}
 }
 
 func TestScrapeURLWithMaxAge(t *testing.T) {
