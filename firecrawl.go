@@ -3,7 +3,9 @@ package firecrawl
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -271,6 +273,12 @@ func NewFirecrawlApp(apiKey, apiURL string, timeout ...time.Duration) (*Firecraw
 //   - *FirecrawlDocument or *FirecrawlDocumentV0: The scraped document data depending on the API version.
 //   - error: An error if the scrape request fails.
 func (app *FirecrawlApp) ScrapeURL(url string, params *ScrapeParams) (*FirecrawlDocument, error) {
+	return app.ScrapeURLWithContext(context.Background(), url, params)
+}
+
+// ScrapeURLWithContext scrapes the content of the specified URL using the Firecrawl API.
+// Accepts a context to control cancellation and deadlines.
+func (app *FirecrawlApp) ScrapeURLWithContext(ctx context.Context, url string, params *ScrapeParams) (*FirecrawlDocument, error) {
 	headers := app.prepareHeaders(nil)
 	scrapeBody := map[string]any{"url": url}
 
@@ -326,6 +334,7 @@ func (app *FirecrawlApp) ScrapeURL(url string, params *ScrapeParams) (*Firecrawl
 	}
 
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodPost,
 		fmt.Sprintf("%s/v1/scrape", app.APIURL),
 		scrapeBody,
@@ -362,6 +371,11 @@ func (app *FirecrawlApp) ScrapeURL(url string, params *ScrapeParams) (*Firecrawl
 //   - CrawlStatusResponse: The crawl result if the job is completed.
 //   - error: An error if the crawl request fails.
 func (app *FirecrawlApp) CrawlURL(url string, params *CrawlParams, idempotencyKey *string, pollInterval ...int) (*CrawlStatusResponse, error) {
+	return app.CrawlURLWithContext(context.Background(), url, params, idempotencyKey, pollInterval...)
+}
+
+// CrawlURLWithContext starts a crawl job for the specified URL using the Firecrawl API with context.
+func (app *FirecrawlApp) CrawlURLWithContext(ctx context.Context, url string, params *CrawlParams, idempotencyKey *string, pollInterval ...int) (*CrawlStatusResponse, error) {
 	var key string
 	if idempotencyKey != nil {
 		key = *idempotencyKey
@@ -409,6 +423,7 @@ func (app *FirecrawlApp) CrawlURL(url string, params *CrawlParams, idempotencyKe
 	}
 
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodPost,
 		fmt.Sprintf("%s/v1/crawl", app.APIURL),
 		crawlBody,
@@ -427,7 +442,7 @@ func (app *FirecrawlApp) CrawlURL(url string, params *CrawlParams, idempotencyKe
 		return nil, err
 	}
 
-	return app.monitorJobStatus(crawlResponse.ID, headers, actualPollInterval)
+	return app.monitorJobStatus(ctx, crawlResponse.ID, headers, actualPollInterval)
 }
 
 // CrawlURL starts a crawl job for the specified URL using the Firecrawl API.
@@ -441,6 +456,11 @@ func (app *FirecrawlApp) CrawlURL(url string, params *CrawlParams, idempotencyKe
 //   - *CrawlResponse: The crawl response with id.
 //   - error: An error if the crawl request fails.
 func (app *FirecrawlApp) AsyncCrawlURL(url string, params *CrawlParams, idempotencyKey *string) (*CrawlResponse, error) {
+	return app.AsyncCrawlURLWithContext(context.Background(), url, params, idempotencyKey)
+}
+
+// AsyncCrawlURLWithContext starts a crawl job asynchronously with context.
+func (app *FirecrawlApp) AsyncCrawlURLWithContext(ctx context.Context, url string, params *CrawlParams, idempotencyKey *string) (*CrawlResponse, error) {
 	var key string
 	if idempotencyKey != nil {
 		key = *idempotencyKey
@@ -483,6 +503,7 @@ func (app *FirecrawlApp) AsyncCrawlURL(url string, params *CrawlParams, idempote
 	}
 
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodPost,
 		fmt.Sprintf("%s/v1/crawl", app.APIURL),
 		crawlBody,
@@ -518,10 +539,16 @@ func (app *FirecrawlApp) AsyncCrawlURL(url string, params *CrawlParams, idempote
 //   - *CrawlStatusResponse: The status of the crawl job.
 //   - error: An error if the crawl status check request fails.
 func (app *FirecrawlApp) CheckCrawlStatus(ID string) (*CrawlStatusResponse, error) {
+	return app.CheckCrawlStatusWithContext(context.Background(), ID)
+}
+
+// CheckCrawlStatusWithContext checks the status of a crawl job using context.
+func (app *FirecrawlApp) CheckCrawlStatusWithContext(ctx context.Context, ID string) (*CrawlStatusResponse, error) {
 	headers := app.prepareHeaders(nil)
 	apiURL := fmt.Sprintf("%s/v1/crawl/%s", app.APIURL, ID)
 
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodGet,
 		apiURL,
 		nil,
@@ -552,9 +579,15 @@ func (app *FirecrawlApp) CheckCrawlStatus(ID string) (*CrawlStatusResponse, erro
 //   - string: The status of the crawl job after cancellation.
 //   - error: An error if the crawl job cancellation request fails.
 func (app *FirecrawlApp) CancelCrawlJob(ID string) (string, error) {
+	return app.CancelCrawlJobWithContext(context.Background(), ID)
+}
+
+// CancelCrawlJobWithContext cancels a crawl job using context.
+func (app *FirecrawlApp) CancelCrawlJobWithContext(ctx context.Context, ID string) (string, error) {
 	headers := app.prepareHeaders(nil)
 	apiURL := fmt.Sprintf("%s/v1/crawl/%s", app.APIURL, ID)
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodDelete,
 		apiURL,
 		nil,
@@ -584,6 +617,11 @@ func (app *FirecrawlApp) CancelCrawlJob(ID string) (string, error) {
 //   - *MapResponse: The response from the mapping operation.
 //   - error: An error if the mapping request fails.
 func (app *FirecrawlApp) MapURL(url string, params *MapParams) (*MapResponse, error) {
+	return app.MapURLWithContext(context.Background(), url, params)
+}
+
+// MapURLWithContext initiates a mapping operation for a URL using context.
+func (app *FirecrawlApp) MapURLWithContext(ctx context.Context, url string, params *MapParams) (*MapResponse, error) {
 	headers := app.prepareHeaders(nil)
 	jsonData := map[string]any{"url": url}
 
@@ -603,6 +641,7 @@ func (app *FirecrawlApp) MapURL(url string, params *MapParams) (*MapResponse, er
 	}
 
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodPost,
 		fmt.Sprintf("%s/v1/map", app.APIURL),
 		jsonData,
@@ -670,7 +709,7 @@ func (app *FirecrawlApp) prepareHeaders(idempotencyKey *string) map[string]strin
 // Returns:
 //   - []byte: The response body from the request.
 //   - error: An error if the request fails.
-func (app *FirecrawlApp) makeRequest(method, url string, data map[string]any, headers map[string]string, action string, opts ...requestOption) ([]byte, error) {
+func (app *FirecrawlApp) makeRequest(ctx context.Context, method, url string, data map[string]any, headers map[string]string, action string, opts ...requestOption) ([]byte, error) {
 	var body []byte
 	var err error
 	if data != nil {
@@ -680,7 +719,7 @@ func (app *FirecrawlApp) makeRequest(method, url string, data map[string]any, he
 		}
 	}
 
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}
@@ -728,11 +767,12 @@ func (app *FirecrawlApp) makeRequest(method, url string, data map[string]any, he
 // Returns:
 //   - *CrawlStatusResponse: The crawl result if the job is completed.
 //   - error: An error if the crawl status check request fails.
-func (app *FirecrawlApp) monitorJobStatus(ID string, headers map[string]string, pollInterval int) (*CrawlStatusResponse, error) {
+func (app *FirecrawlApp) monitorJobStatus(ctx context.Context, ID string, headers map[string]string, pollInterval int) (*CrawlStatusResponse, error) {
 	attempts := 3
 
 	for {
 		resp, err := app.makeRequest(
+			ctx,
 			http.MethodGet,
 			fmt.Sprintf("%s/v1/crawl/%s", app.APIURL, ID),
 			nil,
@@ -760,6 +800,7 @@ func (app *FirecrawlApp) monitorJobStatus(ID string, headers map[string]string, 
 				allData := statusData.Data
 				for statusData.Next != nil {
 					resp, err := app.makeRequest(
+						ctx,
 						http.MethodGet,
 						*statusData.Next,
 						nil,
@@ -833,5 +874,5 @@ func (app *FirecrawlApp) handleError(statusCode int, body []byte, action string)
 		message = fmt.Sprintf("Unexpected error during %s: Status code %d. %s", action, statusCode, errorMessage)
 	}
 
-	return fmt.Errorf(message)
+	return errors.New(message)
 }
