@@ -11,10 +11,11 @@ import (
 
 // FirecrawlApp represents a client for the Firecrawl API.
 type FirecrawlApp struct {
-	apiKey  string // unexported — use APIKey() accessor
-	APIURL  string
-	Client  *http.Client
-	Version string
+	apiKey    string // unexported — use APIKey() accessor
+	APIURL    string
+	Client    *http.Client
+	Version   string
+	userAgent string // set by constructor; sent as User-Agent header on every request
 }
 
 // APIKey returns the configured API key.
@@ -67,20 +68,85 @@ func NewFirecrawlApp(apiKey, apiURL string, timeout ...time.Duration) (*Firecraw
 		}
 	}
 
-	t := 120 * time.Second // default
+	cfg := defaultClientConfig()
 	if len(timeout) > 0 {
-		t = timeout[0]
+		cfg.timeout = timeout[0]
+	}
+
+	return newFirecrawlAppFromConfig(apiKey, apiURL, cfg)
+}
+
+// NewFirecrawlAppWithOptions creates a new instance of FirecrawlApp using
+// functional options for configuration.
+//
+// Parameters:
+//   - apiKey: The API key for authenticating with the Firecrawl API. If empty, it will be retrieved from the FIRECRAWL_API_KEY environment variable.
+//   - apiURL: The base URL for the Firecrawl API. If empty, it will be retrieved from the FIRECRAWL_API_URL environment variable, defaulting to "https://api.firecrawl.dev".
+//   - opts: Functional options (WithTimeout, WithTransport, WithUserAgent, WithMaxIdleConns, WithMaxIdleConnsPerHost).
+//
+// Returns:
+//   - *FirecrawlApp: A new instance of FirecrawlApp configured with the provided or retrieved API key, API URL, and options.
+//   - error: An error if the API key is not provided or retrieved.
+func NewFirecrawlAppWithOptions(apiKey, apiURL string, opts ...ClientOption) (*FirecrawlApp, error) {
+	if apiKey == "" {
+		apiKey = os.Getenv("FIRECRAWL_API_KEY")
+		if apiKey == "" {
+			return nil, fmt.Errorf("%w", ErrNoAPIKey)
+		}
+	}
+
+	if apiURL == "" {
+		apiURL = os.Getenv("FIRECRAWL_API_URL")
+		if apiURL == "" {
+			apiURL = "https://api.firecrawl.dev"
+		}
+	}
+
+	// Warn when a non-localhost HTTP URL is used — API key will be sent in cleartext.
+	parsedURL, err := url.Parse(apiURL)
+	if err == nil && parsedURL.Scheme == "http" {
+		host := parsedURL.Hostname()
+		if host != "localhost" && host != "127.0.0.1" && host != "::1" {
+			log.Println("WARNING: firecrawl-go: API URL uses HTTP. API key will be transmitted in cleartext. Use HTTPS in production.")
+		}
+	}
+
+	cfg := defaultClientConfig()
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	return newFirecrawlAppFromConfig(apiKey, apiURL, cfg)
+}
+
+// newFirecrawlAppFromConfig builds a FirecrawlApp from a resolved clientConfig.
+// apiKey and apiURL must already be validated and resolved before calling this.
+func newFirecrawlAppFromConfig(apiKey, apiURL string, cfg *clientConfig) (*FirecrawlApp, error) {
+	var transport http.RoundTripper
+	if cfg.transport != nil {
+		transport = cfg.transport
+	} else {
+		defaultT, ok := http.DefaultTransport.(*http.Transport)
+		if !ok {
+			return nil, fmt.Errorf("firecrawl-go: http.DefaultTransport is not *http.Transport; use WithTransport to supply a custom transport")
+		}
+		cloned := defaultT.Clone()
+		cloned.MaxIdleConns = cfg.maxIdleConns
+		cloned.MaxIdleConnsPerHost = cfg.maxIdleConnsPerHost
+		transport = cloned
 	}
 
 	client := &http.Client{
-		Timeout:   t,
-		Transport: http.DefaultTransport,
+		Timeout:   cfg.timeout,
+		Transport: transport,
 	}
 
 	return &FirecrawlApp{
-		apiKey: apiKey,
-		APIURL: apiURL,
-		Client: client,
+		apiKey:    apiKey,
+		APIURL:    apiURL,
+		Client:    client,
+		Version:   SDKVersion,
+		userAgent: cfg.userAgent,
 	}, nil
 }
 
@@ -96,6 +162,7 @@ func (app *FirecrawlApp) prepareHeaders(idempotencyKey *string) map[string]strin
 	headers := map[string]string{
 		"Content-Type":  "application/json",
 		"Authorization": fmt.Sprintf("Bearer %s", app.apiKey),
+		"User-Agent":    app.userAgent,
 	}
 	if idempotencyKey != nil {
 		headers["x-idempotency-key"] = *idempotencyKey

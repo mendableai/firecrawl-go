@@ -1,3 +1,21 @@
+## [IMP-15: HTTP Client Improvements] - 2026-03-15
+
+### Added
+- `client_options.go` — `SDKVersion` constant (`"2.0.0"`), `clientConfig` struct, `defaultClientConfig()`, `ClientOption` functional option type, and five option functions: `WithTimeout`, `WithTransport`, `WithUserAgent`, `WithMaxIdleConns`, `WithMaxIdleConnsPerHost`
+- `NewFirecrawlAppWithOptions` constructor — accepts variadic `ClientOption` for ergonomic configuration
+- `userAgent` unexported field on `FirecrawlApp` — set by constructors, sent as `User-Agent` header on every request
+- 13 new unit tests in `client_test.go`: `TestSDKVersion_NotEmpty`, `TestDefaultUserAgent`, `TestDefaultUserAgent_WithOptions`, `TestCustomUserAgent`, `TestWithTimeout`, `TestWithTransport`, `TestWithMaxIdleConns`, `TestDefaultTransportCloned`, `TestBackwardCompatibility_NoTimeout`, `TestBackwardCompatibility_WithTimeout`, `TestNewFirecrawlAppWithOptions_EmptyKey`, `TestNewFirecrawlAppWithOptions_DefaultURL`, `TestVersionFieldSet`
+
+### Changed
+- `client.go` — `NewFirecrawlApp` now delegates to `newFirecrawlAppFromConfig` (internal); sets `Version` and `userAgent` fields; clones `http.DefaultTransport` instead of referencing it directly so SDK settings don't leak to other HTTP clients in the process
+- `client.go` — `prepareHeaders` now includes `User-Agent` header from `app.userAgent`
+- `client.go` — `FirecrawlApp` struct now has `userAgent string` unexported field
+
+### Notes
+- `NewFirecrawlApp(key, url, timeout)` signature is fully backward-compatible — the variadic `time.Duration` parameter still works
+- `http.DefaultTransport` is now cloned, not mutated; the type assertion uses the two-value form to satisfy `errcheck` lint rule
+- `Version` field on `FirecrawlApp` is now populated with `SDKVersion` by both constructors
+
 ## [IMP-07: Unit Tests for Existing Methods] - 2026-03-15
 
 ### Added
