@@ -2,6 +2,7 @@ package firecrawl
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -37,7 +38,7 @@ func (app *FirecrawlApp) makeRequest(method, url string, data map[string]any, he
 	options := newRequestOptions(opts...)
 	for i := 0; i < options.retries; i++ {
 		var req *http.Request
-		req, err = http.NewRequest(method, url, bytes.NewBuffer(body))
+		req, err = http.NewRequestWithContext(context.Background(), method, url, bytes.NewBuffer(body))
 		if err != nil {
 			return nil, err
 		}

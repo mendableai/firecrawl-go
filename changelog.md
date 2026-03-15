@@ -1,3 +1,16 @@
+## [CI Fix: Resolve all golangci-lint and test failures] - 2026-03-15
+
+### Changed
+- `firecrawl_test.go` — Added `//go:build integration` build tag so CI's `go test ./...` no longer crashes without `.env`; replaced `init()` / `log.Fatalf` with `TestMain` that gracefully exits if `.env` is missing; renamed inner loop variables `response`/`err` in `TestCheckCrawlStatusE2E` to `statusResponse`/`statusErr` to eliminate shadow warning
+- `crawl.go` — Removed blank line between `makeRequest` call and `if err != nil` in `AsyncCrawlURL` to satisfy gofumpt
+- `.golangci.yml` — Removed `enable-all: true` from govet; added explicit `disable: [fieldalignment]` to suppress false-positive struct padding warnings on types scheduled for rewrite in MIG-04
+- `helpers.go` — Changed `http.NewRequest` to `http.NewRequestWithContext(context.Background(), ...)` to satisfy noctx linter; added `"context"` import
+- `errors.go` — Changed `fmt.Errorf(message)` to `errors.New(message)` to fix staticcheck SA1006 (printf verb with non-constant format); added `"errors"` import
+
+### Notes
+- `go build ./...`, `go vet ./...`, and `go test ./...` all pass cleanly
+- Integration tests still run via `go test -tags=integration ./...` (requires `.env` with API_URL and TEST_API_KEY)
+
 ## [MIG-03: Foundation — CI/CD Pipeline Setup] - 2026-03-15
 
 ### Added

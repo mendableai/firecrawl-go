@@ -155,7 +155,6 @@ func (app *FirecrawlApp) AsyncCrawlURL(url string, params *CrawlParams, idempote
 		withRetries(3),
 		withBackoff(500),
 	)
-
 	if err != nil {
 		return nil, err
 	}

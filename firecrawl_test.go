@@ -1,3 +1,5 @@
+//go:build integration
+
 package firecrawl
 
 import (
@@ -19,13 +21,15 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
-func init() {
+func TestMain(m *testing.M) {
 	err := godotenv.Load(".env")
 	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
+		log.Printf("Warning: could not load .env file: %v — skipping integration tests", err)
+		os.Exit(0)
 	}
 	API_URL = os.Getenv("API_URL")
 	TEST_API_KEY = os.Getenv("TEST_API_KEY")
+	os.Exit(m.Run())
 }
 
 func TestNoAPIKey(t *testing.T) {
@@ -321,15 +325,15 @@ func TestCheckCrawlStatusE2E(t *testing.T) {
 
 		time.Sleep(5 * time.Second) // wait for 5 seconds
 
-		response, err := app.CheckCrawlStatus(asyncCrawlResponse.ID)
-		require.NoError(t, err)
-		assert.NotNil(t, response)
+		statusResponse, statusErr := app.CheckCrawlStatus(asyncCrawlResponse.ID)
+		require.NoError(t, statusErr)
+		assert.NotNil(t, statusResponse)
 
-		assert.GreaterOrEqual(t, len(response.Data), 0)
-		assert.GreaterOrEqual(t, response.Total, 0)
-		assert.GreaterOrEqual(t, response.CreditsUsed, 0)
+		assert.GreaterOrEqual(t, len(statusResponse.Data), 0)
+		assert.GreaterOrEqual(t, statusResponse.Total, 0)
+		assert.GreaterOrEqual(t, statusResponse.CreditsUsed, 0)
 
-		if response.Status == "completed" {
+		if statusResponse.Status == "completed" {
 			break
 		}
 
