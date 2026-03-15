@@ -1,3 +1,19 @@
+## [IMP-03: Extract Endpoints] - 2026-03-15
+
+### Added
+- `extract.go` — `extractRequest` unexported struct (URLs, Prompt, Schema, EnableWebSearch, IgnoreSitemap, IncludeSubdomains, ShowSources, IgnoreInvalidURLs, ScrapeOptions) for internal request marshaling
+- `extract.go` — `AsyncExtract(ctx, urls, params)` — POST `/v2/extract`, returns `*ExtractResponse` with job ID; maps all `ExtractParams` fields onto the internal request struct
+- `extract.go` — `Extract(ctx, urls, params)` — sync wrapper that calls `AsyncExtract` then polls via `monitorExtractStatus` until `"completed"` or `"failed"`
+- `extract.go` — `CheckExtractStatus(ctx, id)` — GET `/v2/extract/{id}`, validates `id` via `validateJobID` (UUID check, path injection prevention), returns `*ExtractStatusResponse`
+- `extract.go` — `monitorExtractStatus(ctx, id, headers)` — internal polling loop; handles `"processing"` (wait 2s), `"completed"` (return result), `"failed"` (error), and empty/unknown status; context-aware via `select` on `ctx.Done()`; no pagination (unlike crawl/batch)
+- `extract_test.go` — 16 unit tests: `TestAsyncExtract_Success`, `TestAsyncExtract_WithParams`, `TestAsyncExtract_MissingID`, `TestAsyncExtract_Unauthorized`, `TestExtract_PollsUntilComplete`, `TestExtract_ContextCancelled`, `TestExtract_Failed`, `TestCheckExtractStatus_Success`, `TestCheckExtractStatus_Processing`, `TestCheckExtractStatus_InvalidID`, `TestCheckExtractStatus_PathTraversalID`, `TestCheckExtractStatus_Unauthorized`, `TestMonitorExtractStatus_CompletedImmediately`, `TestMonitorExtractStatus_Failed`, `TestMonitorExtractStatus_UnknownStatus`, `TestMonitorExtractStatus_EmptyStatus`, `TestMonitorExtractStatus_ContextCancelledBeforeRequest`
+
+### Notes
+- Extract uses `"processing"` status during polling (not `"scraping"` like crawl/batch)
+- No pagination in `monitorExtractStatus` — `ExtractStatusResponse.Data` is `map[string]any`, not a paginated list
+- `CheckExtractStatus` validates job ID via `validateJobID` (SSRF/path injection prevention), consistent with `CheckBatchScrapeStatus`
+- All 148 tests pass (`go test -race ./...`); `make check` (lint + vet + test) passes with 0 issues
+
 ## [IMP-02: Batch Scrape Endpoints] - 2026-03-15
 
 ### Added
