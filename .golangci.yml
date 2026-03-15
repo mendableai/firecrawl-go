@@ -1,3 +1,5 @@
+version: "2"
+
 run:
   timeout: 5m
 
@@ -16,12 +18,12 @@ linters:
     - gosec
     - prealloc
 
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-  govet:
-    disable:
-      - fieldalignment
-  gosec:
-    excludes:
-      - G402  # TLS InsecureSkipVerify (user controls this)
+  settings:
+    errcheck:
+      check-type-assertions: true
+    govet:
+      disable:
+        - fieldalignment
+    gosec:
+      excludes:
+        - G402  # TLS InsecureSkipVerify (user controls this)
