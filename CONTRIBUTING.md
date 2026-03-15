@@ -69,7 +69,3 @@ Integration tests consume API credits.
 5. Run `make check` to verify everything passes.
 
 Every exported symbol must have a godoc comment. Public methods must document all parameters, return values, and any error conditions.
-
-## Detailed Guide
-
-For a comprehensive architecture overview, code patterns, request flow diagrams, and FAQ, see the [full contribution guide](../../specs/firecrawl-go-v2/contribution-guide.md) in the Agentic Layer specs.
