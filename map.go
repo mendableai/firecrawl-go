@@ -7,6 +7,19 @@ import (
 	"net/http"
 )
 
+// mapRequest is the internal request body for the v2 /map endpoint.
+type mapRequest struct {
+	URL                   string          `json:"url"`
+	IncludeSubdomains     *bool           `json:"includeSubdomains,omitempty"`
+	Search                *string         `json:"search,omitempty"`
+	Limit                 *int            `json:"limit,omitempty"`
+	Sitemap               *string         `json:"sitemap,omitempty"`
+	IgnoreQueryParameters *bool           `json:"ignoreQueryParameters,omitempty"`
+	IgnoreCache           *bool           `json:"ignoreCache,omitempty"`
+	Timeout               *int            `json:"timeout,omitempty"`
+	Location              *LocationConfig `json:"location,omitempty"`
+}
+
 // MapURL initiates a mapping operation for a URL using the Firecrawl API.
 //
 // Parameters:
@@ -19,36 +32,20 @@ import (
 //   - error: An error if the mapping request fails.
 func (app *FirecrawlApp) MapURL(ctx context.Context, url string, params *MapParams) (*MapResponse, error) {
 	headers := app.prepareHeaders(nil)
-	jsonData := map[string]any{"url": url}
 
+	req := mapRequest{URL: url}
 	if params != nil {
-		if params.IncludeSubdomains != nil {
-			jsonData["includeSubdomains"] = params.IncludeSubdomains
-		}
-		if params.Search != nil {
-			jsonData["search"] = params.Search
-		}
-		if params.Sitemap != nil {
-			jsonData["sitemap"] = params.Sitemap
-		}
-		if params.Limit != nil {
-			jsonData["limit"] = params.Limit
-		}
-		if params.IgnoreQueryParameters != nil {
-			jsonData["ignoreQueryParameters"] = params.IgnoreQueryParameters
-		}
-		if params.IgnoreCache != nil {
-			jsonData["ignoreCache"] = params.IgnoreCache
-		}
-		if params.Timeout != nil {
-			jsonData["timeout"] = params.Timeout
-		}
-		if params.Location != nil {
-			jsonData["location"] = params.Location
-		}
+		req.IncludeSubdomains = params.IncludeSubdomains
+		req.Search = params.Search
+		req.Limit = params.Limit
+		req.Sitemap = params.Sitemap
+		req.IgnoreQueryParameters = params.IgnoreQueryParameters
+		req.IgnoreCache = params.IgnoreCache
+		req.Timeout = params.Timeout
+		req.Location = params.Location
 	}
 
-	jsonDataBytes, err := json.Marshal(jsonData)
+	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal map request: %w", err)
 	}
@@ -56,8 +53,8 @@ func (app *FirecrawlApp) MapURL(ctx context.Context, url string, params *MapPara
 	resp, err := app.makeRequest(
 		ctx,
 		http.MethodPost,
-		fmt.Sprintf("%s/v1/map", app.APIURL),
-		jsonDataBytes,
+		fmt.Sprintf("%s/v2/map", app.APIURL),
+		body,
 		headers,
 		"map",
 	)

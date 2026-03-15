@@ -1,3 +1,17 @@
+## [MIG-09: Core Migration — MapURL v2 Migration] - 2026-03-15
+
+### Added
+- `map.go` — `mapRequest` unexported struct with `json:",omitempty"` tags for all v2 map parameters (URL, IncludeSubdomains, Search, Limit, Sitemap, IgnoreQueryParameters, IgnoreCache, Timeout, Location)
+
+### Changed
+- `map.go` — `MapURL`: replaced `map[string]any` body construction with `mapRequest` struct marshaling; changed endpoint from `/v1/map` to `/v2/map`
+
+### Notes
+- `MapResponse.Links` is `[]MapLink` (set in MIG-04); no change needed to response handling
+- `IgnoreSitemap` is not referenced — replaced by the `Sitemap` enum string (`MapParams.Sitemap`) from MIG-04
+- All v2 new params supported: `IgnoreQueryParameters`, `IgnoreCache`, `Timeout`, `Location`
+- `go build ./...` and `go vet ./...` pass cleanly
+
 ## [MIG-08: Core Migration — CheckCrawlStatus/CancelCrawlJob v2 Migration] - 2026-03-15
 
 ### Changed
