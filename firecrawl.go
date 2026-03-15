@@ -274,24 +274,6 @@ func (app *FirecrawlApp) ScrapeURL(url string, params *ScrapeParams) (*Firecrawl
 	headers := app.prepareHeaders(nil)
 	scrapeBody := map[string]any{"url": url}
 
-	// if params != nil {
-	// 	if extractorOptions, ok := params["extractorOptions"].(ExtractorOptions); ok {
-	// 		if schema, ok := extractorOptions.ExtractionSchema.(interface{ schema() any }); ok {
-	// 			extractorOptions.ExtractionSchema = schema.schema()
-	// 		}
-	// 		if extractorOptions.Mode == "" {
-	// 			extractorOptions.Mode = "llm-extraction"
-	// 		}
-	// 		scrapeBody["extractorOptions"] = extractorOptions
-	// 	}
-
-	// 	for key, value := range params {
-	// 		if key != "extractorOptions" {
-	// 			scrapeBody[key] = value
-	// 		}
-	// 	}
-	// }
-
 	if params != nil {
 		if params.Formats != nil {
 			scrapeBody["formats"] = params.Formats
@@ -337,17 +319,15 @@ func (app *FirecrawlApp) ScrapeURL(url string, params *ScrapeParams) (*Firecrawl
 	}
 
 	var scrapeResponse ScrapeResponse
-	err = json.Unmarshal(resp, &scrapeResponse)
-
-	if scrapeResponse.Success {
-		return scrapeResponse.Data, nil
+	if err := json.Unmarshal(resp, &scrapeResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse scrape response: %w", err)
 	}
 
-	if err != nil {
-		return nil, err
+	if !scrapeResponse.Success {
+		return nil, fmt.Errorf("failed to scrape URL")
 	}
 
-	return nil, fmt.Errorf("failed to scrape URL")
+	return scrapeResponse.Data, nil
 }
 
 // CrawlURL starts a crawl job for the specified URL using the Firecrawl API.
@@ -371,8 +351,12 @@ func (app *FirecrawlApp) CrawlURL(url string, params *CrawlParams, idempotencyKe
 	crawlBody := map[string]any{"url": url}
 
 	if params != nil {
-		if params.ScrapeOptions.Formats != nil {
-			crawlBody["scrapeOptions"] = params.ScrapeOptions
+		scrapeOpts := params.ScrapeOptions
+		if scrapeOpts.Formats != nil || scrapeOpts.Headers != nil || scrapeOpts.IncludeTags != nil ||
+			scrapeOpts.ExcludeTags != nil || scrapeOpts.OnlyMainContent != nil || scrapeOpts.WaitFor != nil ||
+			scrapeOpts.ParsePDF != nil || scrapeOpts.Timeout != nil || scrapeOpts.MaxAge != nil ||
+			scrapeOpts.JsonOptions != nil {
+			crawlBody["scrapeOptions"] = scrapeOpts
 		}
 		if params.Webhook != nil {
 			crawlBody["webhook"] = params.Webhook
@@ -450,8 +434,12 @@ func (app *FirecrawlApp) AsyncCrawlURL(url string, params *CrawlParams, idempote
 	crawlBody := map[string]any{"url": url}
 
 	if params != nil {
-		if params.ScrapeOptions.Formats != nil {
-			crawlBody["scrapeOptions"] = params.ScrapeOptions
+		scrapeOpts := params.ScrapeOptions
+		if scrapeOpts.Formats != nil || scrapeOpts.Headers != nil || scrapeOpts.IncludeTags != nil ||
+			scrapeOpts.ExcludeTags != nil || scrapeOpts.OnlyMainContent != nil || scrapeOpts.WaitFor != nil ||
+			scrapeOpts.ParsePDF != nil || scrapeOpts.Timeout != nil || scrapeOpts.MaxAge != nil ||
+			scrapeOpts.JsonOptions != nil {
+			crawlBody["scrapeOptions"] = scrapeOpts
 		}
 		if params.Webhook != nil {
 			crawlBody["webhook"] = params.Webhook
@@ -680,30 +668,33 @@ func (app *FirecrawlApp) makeRequest(method, url string, data map[string]any, he
 		}
 	}
 
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, err
-	}
-
-	for key, value := range headers {
-		req.Header.Set(key, value)
-	}
-
 	var resp *http.Response
 	options := newRequestOptions(opts...)
 	for i := 0; i < options.retries; i++ {
+		var req *http.Request
+		req, err = http.NewRequest(method, url, bytes.NewBuffer(body))
+		if err != nil {
+			return nil, err
+		}
+
+		for key, value := range headers {
+			req.Header.Set(key, value)
+		}
+
 		resp, err = app.Client.Do(req)
 		if err != nil {
 			return nil, err
 		}
-		defer resp.Body.Close()
 
 		if resp.StatusCode != 502 {
 			break
 		}
 
+		// Close body before retry — do NOT defer in loop
+		resp.Body.Close()
 		time.Sleep(time.Duration(math.Pow(2, float64(i))) * time.Duration(options.backoff) * time.Millisecond)
 	}
+	defer resp.Body.Close() // Defer close of the final response only
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -729,7 +720,7 @@ func (app *FirecrawlApp) makeRequest(method, url string, data map[string]any, he
 //   - *CrawlStatusResponse: The crawl result if the job is completed.
 //   - error: An error if the crawl status check request fails.
 func (app *FirecrawlApp) monitorJobStatus(ID string, headers map[string]string, pollInterval int) (*CrawlStatusResponse, error) {
-	attempts := 3
+	attempts := 0
 
 	for {
 		resp, err := app.makeRequest(
