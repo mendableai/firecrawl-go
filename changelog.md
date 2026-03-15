@@ -1,3 +1,15 @@
+## [MIG-11: Core Migration — Request Body Refactor Verification] - 2026-03-15
+
+### Notes
+- Verification checkpoint confirming the request body refactor is fully complete across all endpoints
+- `makeRequest` signature is `(ctx context.Context, method, url string, body []byte, headers map[string]string, action string, opts ...requestOption)` — accepts pre-marshaled `[]byte`, no internal `json.Marshal`
+- All POST endpoints use typed request structs with caller-side marshaling: `ScrapeURL` → `scrapeRequest`, `CrawlURL`/`AsyncCrawlURL` → `crawlRequest` (via `buildCrawlRequest`), `MapURL` → `mapRequest`
+- All GET/DELETE endpoints (`CheckCrawlStatus`, `CancelCrawlJob`, `monitorJobStatus` pagination) pass `nil` body
+- `Search` is a stub returning `fmt.Errorf("Search is not implemented in API version 1.0.0")` — no request body needed
+- `map[string]any` appears only in `errors.go` (response error parsing), `types.go` (response field types: `JsonOptions.Schema`, `WebhookConfig.Metadata`, `FirecrawlDocument.JSON`, etc.) — zero occurrences in request body construction
+- No `/v1/` path references anywhere in the codebase
+- `go build ./...` and `go vet ./...` pass cleanly
+
 ## [MIG-09: Core Migration — MapURL v2 Migration] - 2026-03-15
 
 ### Added
