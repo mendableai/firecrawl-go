@@ -379,3 +379,113 @@ func TestMonitorBatchScrapeStatus_PaginationUnsafeURL(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unsafe pagination URL")
 }
+
+// ---- CheckBatchScrapeStatus with PaginationConfig ----
+
+func TestCheckBatchScrapeStatus_NoPagination_BackwardCompat(t *testing.T) {
+	// Calling without pagination parameter returns the single page (backward compatible).
+	var serverURL string
+	app, srv := newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		next := serverURL + "/v2/batch/scrape/" + validBatchID + "?cursor=2"
+		respondJSON(w, http.StatusOK, BatchScrapeStatusResponse{
+			Status:    "completed",
+			Total:     2,
+			Completed: 2,
+			Data:      []*FirecrawlDocument{{Markdown: "# Page 1"}},
+			Next:      &next,
+		})
+	})
+	serverURL = srv.URL
+
+	result, err := app.CheckBatchScrapeStatus(context.Background(), validBatchID)
+	require.NoError(t, err)
+	assert.Equal(t, "completed", result.Status)
+	// Only the first page returned — Next is present but not followed.
+	assert.Len(t, result.Data, 1)
+	assert.NotNil(t, result.Next)
+}
+
+func TestCheckBatchScrapeStatus_AutoPaginate_FollowsNextURLs(t *testing.T) {
+	requestCount := 0
+	var serverURL string
+	app, srv := newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		if requestCount == 1 {
+			// First page: has a Next URL.
+			next := serverURL + "/v2/batch/scrape/" + validBatchID + "?cursor=2"
+			respondJSON(w, http.StatusOK, BatchScrapeStatusResponse{
+				Status:    "completed",
+				Total:     2,
+				Completed: 2,
+				Data:      []*FirecrawlDocument{{Markdown: "# Page 1"}},
+				Next:      &next,
+			})
+			return
+		}
+		// Second page: no Next URL, pagination ends.
+		respondJSON(w, http.StatusOK, BatchScrapeStatusResponse{
+			Status:    "completed",
+			Total:     2,
+			Completed: 2,
+			Data:      []*FirecrawlDocument{{Markdown: "# Page 2"}},
+		})
+	})
+	serverURL = srv.URL
+
+	cfg := &PaginationConfig{AutoPaginate: ptr(true)}
+	result, err := app.CheckBatchScrapeStatus(context.Background(), validBatchID, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, 2, requestCount)
+	assert.Len(t, result.Data, 2)
+	assert.Equal(t, "# Page 1", result.Data[0].Markdown)
+	assert.Equal(t, "# Page 2", result.Data[1].Markdown)
+}
+
+func TestCheckBatchScrapeStatus_AutoPaginate_UnsafeNextURL(t *testing.T) {
+	app, _ := newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		next := "https://attacker.example.com/steal?cursor=2"
+		respondJSON(w, http.StatusOK, BatchScrapeStatusResponse{
+			Status:    "completed",
+			Total:     2,
+			Completed: 2,
+			Data:      []*FirecrawlDocument{{Markdown: "# Page 1"}},
+			Next:      &next,
+		})
+	})
+
+	cfg := &PaginationConfig{AutoPaginate: ptr(true)}
+	_, err := app.CheckBatchScrapeStatus(context.Background(), validBatchID, cfg)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unsafe pagination URL")
+}
+
+// ---- GetBatchScrapeStatusPage ----
+
+func TestGetBatchScrapeStatusPage_Success(t *testing.T) {
+	app, srv := newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		respondJSON(w, http.StatusOK, BatchScrapeStatusResponse{
+			Status:    "completed",
+			Total:     5,
+			Completed: 5,
+			Data:      []*FirecrawlDocument{{Markdown: "# Page 2"}},
+		})
+	})
+
+	nextURL := srv.URL + "/v2/batch/scrape/" + validBatchID + "?cursor=2"
+	result, err := app.GetBatchScrapeStatusPage(context.Background(), nextURL)
+	require.NoError(t, err)
+	assert.Equal(t, "completed", result.Status)
+	assert.Len(t, result.Data, 1)
+	assert.Equal(t, "# Page 2", result.Data[0].Markdown)
+}
+
+func TestGetBatchScrapeStatusPage_InvalidURL_SSRFBlocked(t *testing.T) {
+	app, _ := newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("request should not be made to untrusted host")
+	})
+
+	_, err := app.GetBatchScrapeStatusPage(context.Background(), "https://attacker.example.com/steal")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unsafe pagination URL")
+}

@@ -1,3 +1,33 @@
+## [IMP-10: PaginationConfig Support] - 2026-03-15
+
+### Added
+- `crawl.go` — `autoPaginateCrawlStatus`: private helper that follows Next URLs with MaxPages, MaxResults, and MaxWaitTime limits; validates each Next URL against the configured API host (SSRF prevention)
+- `crawl.go` — `GetCrawlStatusPage`: public method for manual page-by-page crawl status fetching; validates the Next URL before making any request
+- `batch.go` — `autoPaginateBatchScrapeStatus`: equivalent auto-pagination helper for batch scrape status
+- `batch.go` — `GetBatchScrapeStatusPage`: public method for manual batch scrape status page fetching
+
+### Changed
+- `crawl.go` — `CheckCrawlStatus` signature updated to `CheckCrawlStatus(ctx, ID string, pagination ...*PaginationConfig)`: variadic parameter preserves full backward compatibility; when `AutoPaginate` is true, delegates to `autoPaginateCrawlStatus`; when omitted or false, returns the first page only (previous behavior)
+- `batch.go` — `CheckBatchScrapeStatus` signature updated to `CheckBatchScrapeStatus(ctx, id string, pagination ...*PaginationConfig)`: same variadic pattern
+
+### Tests
+- `crawl_test.go` — `TestCheckCrawlStatus_NoPagination_BackwardCompat`: verifies calling without pagination returns single page with Next still present
+- `crawl_test.go` — `TestCheckCrawlStatus_AutoPaginate_FollowsNextURLs`: verifies two pages are fetched and data accumulated
+- `crawl_test.go` — `TestCheckCrawlStatus_MaxPages_StopsAfterLimit`: verifies pagination halts after MaxPages pages
+- `crawl_test.go` — `TestCheckCrawlStatus_MaxResults_TruncatesExcess`: verifies result count cap stops fetching and truncates data slice
+- `crawl_test.go` — `TestCheckCrawlStatus_AutoPaginate_UnsafeNextURL`: verifies SSRF-blocked Next URL returns error
+- `crawl_test.go` — `TestGetCrawlStatusPage_Success`: verifies successful manual page fetch
+- `crawl_test.go` — `TestGetCrawlStatusPage_InvalidURL_SSRFBlocked`: verifies untrusted host is rejected
+- `batch_test.go` — `TestCheckBatchScrapeStatus_NoPagination_BackwardCompat`: batch equivalent of no-pagination compat test
+- `batch_test.go` — `TestCheckBatchScrapeStatus_AutoPaginate_FollowsNextURLs`: batch auto-pagination
+- `batch_test.go` — `TestCheckBatchScrapeStatus_AutoPaginate_UnsafeNextURL`: batch SSRF guard
+- `batch_test.go` — `TestGetBatchScrapeStatusPage_Success`: batch manual page fetch
+- `batch_test.go` — `TestGetBatchScrapeStatusPage_InvalidURL_SSRFBlocked`: batch SSRF rejection
+
+### Notes
+- All existing tests continue to pass — no breaking changes; variadic parameter is fully backward compatible
+- Total test count: 167 (up from 155); all pass with race detector; `make check` passes with 0 lint issues
+
 ## [IMP-08: Unit Tests for New Endpoints] - 2026-03-15
 
 ### Added

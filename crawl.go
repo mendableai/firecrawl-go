@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 // crawlRequest is the internal request struct for crawl operations.
@@ -184,14 +185,19 @@ func (app *FirecrawlApp) AsyncCrawlURL(ctx context.Context, url string, params *
 
 // CheckCrawlStatus checks the status of a crawl job using the Firecrawl API.
 //
+// When a PaginationConfig is provided with AutoPaginate enabled, it automatically
+// follows Next URLs to collect all results, respecting MaxPages, MaxResults, and
+// MaxWaitTime limits. Without PaginationConfig, only the first page is returned.
+//
 // Parameters:
 //   - ctx: Context for cancellation and deadlines.
 //   - ID: The ID of the crawl job to check.
+//   - pagination: An optional PaginationConfig to control auto-pagination behavior.
 //
 // Returns:
-//   - *CrawlStatusResponse: The status of the crawl job.
+//   - *CrawlStatusResponse: The status of the crawl job (possibly spanning multiple pages).
 //   - error: An error if the crawl status check request fails.
-func (app *FirecrawlApp) CheckCrawlStatus(ctx context.Context, ID string) (*CrawlStatusResponse, error) {
+func (app *FirecrawlApp) CheckCrawlStatus(ctx context.Context, ID string, pagination ...*PaginationConfig) (*CrawlStatusResponse, error) {
 	if err := validateJobID(ID); err != nil {
 		return nil, err
 	}
@@ -213,12 +219,129 @@ func (app *FirecrawlApp) CheckCrawlStatus(ctx context.Context, ID string) (*Craw
 	}
 
 	var jobStatusResponse CrawlStatusResponse
-	err = json.Unmarshal(resp, &jobStatusResponse)
+	if err = json.Unmarshal(resp, &jobStatusResponse); err != nil {
+		return nil, err
+	}
+
+	// Without PaginationConfig or AutoPaginate disabled, return the single page.
+	if len(pagination) == 0 || pagination[0] == nil || pagination[0].AutoPaginate == nil || !*pagination[0].AutoPaginate {
+		return &jobStatusResponse, nil
+	}
+
+	return app.autoPaginateCrawlStatus(ctx, &jobStatusResponse, headers, pagination[0])
+}
+
+// autoPaginateCrawlStatus follows Next URLs collecting all data, respecting
+// MaxPages, MaxResults, and MaxWaitTime limits from the provided PaginationConfig.
+func (app *FirecrawlApp) autoPaginateCrawlStatus(ctx context.Context, initial *CrawlStatusResponse, headers map[string]string, cfg *PaginationConfig) (*CrawlStatusResponse, error) {
+	allData := initial.Data
+	current := initial
+	pagesCollected := 1
+	startTime := time.Now()
+
+	maxPages := 0
+	if cfg.MaxPages != nil {
+		maxPages = *cfg.MaxPages
+	}
+	maxResults := 0
+	if cfg.MaxResults != nil {
+		maxResults = *cfg.MaxResults
+	}
+	maxWaitSeconds := 0
+	if cfg.MaxWaitTime != nil {
+		maxWaitSeconds = *cfg.MaxWaitTime
+	}
+
+	for current.Next != nil {
+		// Check page limit.
+		if maxPages > 0 && pagesCollected >= maxPages {
+			break
+		}
+		// Check result limit.
+		if maxResults > 0 && len(allData) >= maxResults {
+			allData = allData[:maxResults]
+			break
+		}
+		// Check time limit.
+		if maxWaitSeconds > 0 && int(time.Since(startTime).Seconds()) >= maxWaitSeconds {
+			break
+		}
+
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
+		if err := validatePaginationURL(app.APIURL, *current.Next); err != nil {
+			return nil, fmt.Errorf("unsafe pagination URL: %w", err)
+		}
+
+		resp, err := app.makeRequest(
+			ctx,
+			http.MethodGet,
+			*current.Next,
+			nil,
+			headers,
+			"fetch next page of crawl status",
+			withRetries(3),
+			withBackoff(500),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		var pageData CrawlStatusResponse
+		if err := json.Unmarshal(resp, &pageData); err != nil {
+			return nil, fmt.Errorf("failed to parse crawl status page: %w", err)
+		}
+
+		if pageData.Data != nil {
+			allData = append(allData, pageData.Data...)
+		}
+		current = &pageData
+		pagesCollected++
+	}
+
+	current.Data = allData
+	return current, nil
+}
+
+// GetCrawlStatusPage fetches a specific page of crawl status results by URL.
+// Use this for manual pagination — pass the Next URL from a previous CrawlStatusResponse.
+//
+// Parameters:
+//   - ctx: Context for cancellation and deadlines.
+//   - nextURL: The full URL of the next results page (from CrawlStatusResponse.Next).
+//
+// Returns:
+//   - *CrawlStatusResponse: The results for this page.
+//   - error: An error if the request fails or the URL is not trusted.
+func (app *FirecrawlApp) GetCrawlStatusPage(ctx context.Context, nextURL string) (*CrawlStatusResponse, error) {
+	if err := validatePaginationURL(app.APIURL, nextURL); err != nil {
+		return nil, fmt.Errorf("unsafe pagination URL: %w", err)
+	}
+
+	headers := app.prepareHeaders(nil)
+
+	resp, err := app.makeRequest(
+		ctx,
+		http.MethodGet,
+		nextURL,
+		nil,
+		headers,
+		"fetch crawl status page",
+		withRetries(3),
+		withBackoff(500),
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	return &jobStatusResponse, nil
+	var statusResponse CrawlStatusResponse
+	if err := json.Unmarshal(resp, &statusResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse crawl status page: %w", err)
+	}
+
+	return &statusResponse, nil
 }
 
 // CancelCrawlJob cancels a crawl job using the Firecrawl API.

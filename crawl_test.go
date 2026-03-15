@@ -2,6 +2,7 @@ package firecrawl
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -396,4 +397,172 @@ func TestBuildCrawlRequest_EmptyScrapeOptions(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, req.ScrapeOptions)
 	assert.Equal(t, 10, *req.Limit)
+}
+
+// ---- CheckCrawlStatus with PaginationConfig ----
+
+func TestCheckCrawlStatus_NoPagination_BackwardCompat(t *testing.T) {
+	// Calling without pagination parameter returns the single page (backward compatible).
+	var serverURL string
+	app, srv := newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		next := serverURL + "/v2/crawl/" + validCrawlID + "?cursor=2"
+		respondJSON(w, http.StatusOK, CrawlStatusResponse{
+			Status:    "completed",
+			Total:     2,
+			Completed: 2,
+			Data:      []*FirecrawlDocument{{Markdown: "# Page 1"}},
+			Next:      &next,
+		})
+	})
+	serverURL = srv.URL
+
+	result, err := app.CheckCrawlStatus(context.Background(), validCrawlID)
+	require.NoError(t, err)
+	assert.Equal(t, "completed", result.Status)
+	// Only the first page returned — Next is present but not followed.
+	assert.Len(t, result.Data, 1)
+	assert.NotNil(t, result.Next)
+}
+
+func TestCheckCrawlStatus_AutoPaginate_FollowsNextURLs(t *testing.T) {
+	requestCount := 0
+	var serverURL string
+	app, srv := newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		if requestCount == 1 {
+			// First page: has a Next URL.
+			next := serverURL + "/v2/crawl/" + validCrawlID + "?cursor=2"
+			respondJSON(w, http.StatusOK, CrawlStatusResponse{
+				Status:    "completed",
+				Total:     2,
+				Completed: 2,
+				Data:      []*FirecrawlDocument{{Markdown: "# Page 1"}},
+				Next:      &next,
+			})
+			return
+		}
+		// Second page: no Next URL, pagination ends.
+		respondJSON(w, http.StatusOK, CrawlStatusResponse{
+			Status:    "completed",
+			Total:     2,
+			Completed: 2,
+			Data:      []*FirecrawlDocument{{Markdown: "# Page 2"}},
+		})
+	})
+	serverURL = srv.URL
+
+	cfg := &PaginationConfig{AutoPaginate: ptr(true)}
+	result, err := app.CheckCrawlStatus(context.Background(), validCrawlID, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, 2, requestCount)
+	assert.Len(t, result.Data, 2)
+	assert.Equal(t, "# Page 1", result.Data[0].Markdown)
+	assert.Equal(t, "# Page 2", result.Data[1].Markdown)
+}
+
+func TestCheckCrawlStatus_MaxPages_StopsAfterLimit(t *testing.T) {
+	requestCount := 0
+	var serverURL string
+	app, srv := newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		next := serverURL + "/v2/crawl/" + validCrawlID + "?cursor=" + fmt.Sprintf("%d", requestCount+1)
+		respondJSON(w, http.StatusOK, CrawlStatusResponse{
+			Status:    "completed",
+			Total:     10,
+			Completed: 10,
+			Data:      []*FirecrawlDocument{{Markdown: fmt.Sprintf("# Page %d", requestCount)}},
+			Next:      &next,
+		})
+	})
+	serverURL = srv.URL
+
+	cfg := &PaginationConfig{
+		AutoPaginate: ptr(true),
+		MaxPages:     ptr(2), // Stop after 2 pages total.
+	}
+	result, err := app.CheckCrawlStatus(context.Background(), validCrawlID, cfg)
+	require.NoError(t, err)
+	// Only fetched page 1 (initial) + page 2 stopped by MaxPages limit.
+	assert.Equal(t, 2, requestCount)
+	assert.Len(t, result.Data, 2)
+}
+
+func TestCheckCrawlStatus_MaxResults_TruncatesExcess(t *testing.T) {
+	requestCount := 0
+	var serverURL string
+	app, srv := newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		next := serverURL + "/v2/crawl/" + validCrawlID + "?cursor=2"
+		respondJSON(w, http.StatusOK, CrawlStatusResponse{
+			Status:    "completed",
+			Total:     6,
+			Completed: 6,
+			Data: []*FirecrawlDocument{
+				{Markdown: "# Doc A"},
+				{Markdown: "# Doc B"},
+				{Markdown: "# Doc C"},
+			},
+			Next: &next,
+		})
+	})
+	serverURL = srv.URL
+
+	cfg := &PaginationConfig{
+		AutoPaginate: ptr(true),
+		MaxResults:   ptr(3), // Stop after collecting 3 results total.
+	}
+	result, err := app.CheckCrawlStatus(context.Background(), validCrawlID, cfg)
+	require.NoError(t, err)
+	// First page gives 3 docs which meets MaxResults — no second request made.
+	assert.Equal(t, 1, requestCount)
+	assert.Len(t, result.Data, 3)
+}
+
+func TestCheckCrawlStatus_AutoPaginate_UnsafeNextURL(t *testing.T) {
+	app, _ := newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		next := "https://attacker.example.com/steal?cursor=2"
+		respondJSON(w, http.StatusOK, CrawlStatusResponse{
+			Status:    "completed",
+			Total:     2,
+			Completed: 2,
+			Data:      []*FirecrawlDocument{{Markdown: "# Page 1"}},
+			Next:      &next,
+		})
+	})
+
+	cfg := &PaginationConfig{AutoPaginate: ptr(true)}
+	_, err := app.CheckCrawlStatus(context.Background(), validCrawlID, cfg)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unsafe pagination URL")
+}
+
+// ---- GetCrawlStatusPage ----
+
+func TestGetCrawlStatusPage_Success(t *testing.T) {
+	app, srv := newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		respondJSON(w, http.StatusOK, CrawlStatusResponse{
+			Status:    "completed",
+			Total:     5,
+			Completed: 5,
+			Data:      []*FirecrawlDocument{{Markdown: "# Page 2"}},
+		})
+	})
+
+	nextURL := srv.URL + "/v2/crawl/" + validCrawlID + "?cursor=2"
+	result, err := app.GetCrawlStatusPage(context.Background(), nextURL)
+	require.NoError(t, err)
+	assert.Equal(t, "completed", result.Status)
+	assert.Len(t, result.Data, 1)
+	assert.Equal(t, "# Page 2", result.Data[0].Markdown)
+}
+
+func TestGetCrawlStatusPage_InvalidURL_SSRFBlocked(t *testing.T) {
+	app, _ := newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("request should not be made to untrusted host")
+	})
+
+	_, err := app.GetCrawlStatusPage(context.Background(), "https://attacker.example.com/steal")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unsafe pagination URL")
 }

@@ -110,14 +110,19 @@ func (app *FirecrawlApp) BatchScrapeURLs(ctx context.Context, urls []string, par
 
 // CheckBatchScrapeStatus checks the status of a batch scrape job.
 //
+// When a PaginationConfig is provided with AutoPaginate enabled, it automatically
+// follows Next URLs to collect all results, respecting MaxPages, MaxResults, and
+// MaxWaitTime limits. Without PaginationConfig, only the first page is returned.
+//
 // Parameters:
 //   - ctx: Context for cancellation and deadlines.
 //   - id: The ID of the batch scrape job to check.
+//   - pagination: An optional PaginationConfig to control auto-pagination behavior.
 //
 // Returns:
-//   - *BatchScrapeStatusResponse: The current status of the batch scrape job.
+//   - *BatchScrapeStatusResponse: The current status of the batch scrape job (possibly spanning multiple pages).
 //   - error: An error if the status check fails.
-func (app *FirecrawlApp) CheckBatchScrapeStatus(ctx context.Context, id string) (*BatchScrapeStatusResponse, error) {
+func (app *FirecrawlApp) CheckBatchScrapeStatus(ctx context.Context, id string, pagination ...*PaginationConfig) (*BatchScrapeStatusResponse, error) {
 	if err := validateJobID(id); err != nil {
 		return nil, err
 	}
@@ -141,6 +146,124 @@ func (app *FirecrawlApp) CheckBatchScrapeStatus(ctx context.Context, id string) 
 	var statusResponse BatchScrapeStatusResponse
 	if err := json.Unmarshal(resp, &statusResponse); err != nil {
 		return nil, fmt.Errorf("failed to parse batch scrape status response: %w", err)
+	}
+
+	// Without PaginationConfig or AutoPaginate disabled, return the single page.
+	if len(pagination) == 0 || pagination[0] == nil || pagination[0].AutoPaginate == nil || !*pagination[0].AutoPaginate {
+		return &statusResponse, nil
+	}
+
+	return app.autoPaginateBatchScrapeStatus(ctx, &statusResponse, headers, pagination[0])
+}
+
+// autoPaginateBatchScrapeStatus follows Next URLs collecting all data, respecting
+// MaxPages, MaxResults, and MaxWaitTime limits from the provided PaginationConfig.
+func (app *FirecrawlApp) autoPaginateBatchScrapeStatus(ctx context.Context, initial *BatchScrapeStatusResponse, headers map[string]string, cfg *PaginationConfig) (*BatchScrapeStatusResponse, error) {
+	allData := initial.Data
+	current := initial
+	pagesCollected := 1
+	startTime := time.Now()
+
+	maxPages := 0
+	if cfg.MaxPages != nil {
+		maxPages = *cfg.MaxPages
+	}
+	maxResults := 0
+	if cfg.MaxResults != nil {
+		maxResults = *cfg.MaxResults
+	}
+	maxWaitSeconds := 0
+	if cfg.MaxWaitTime != nil {
+		maxWaitSeconds = *cfg.MaxWaitTime
+	}
+
+	for current.Next != nil {
+		// Check page limit.
+		if maxPages > 0 && pagesCollected >= maxPages {
+			break
+		}
+		// Check result limit.
+		if maxResults > 0 && len(allData) >= maxResults {
+			allData = allData[:maxResults]
+			break
+		}
+		// Check time limit.
+		if maxWaitSeconds > 0 && int(time.Since(startTime).Seconds()) >= maxWaitSeconds {
+			break
+		}
+
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
+		if err := validatePaginationURL(app.APIURL, *current.Next); err != nil {
+			return nil, fmt.Errorf("unsafe pagination URL: %w", err)
+		}
+
+		resp, err := app.makeRequest(
+			ctx,
+			http.MethodGet,
+			*current.Next,
+			nil,
+			headers,
+			"fetch next page of batch scrape status",
+			withRetries(3),
+			withBackoff(500),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		var pageData BatchScrapeStatusResponse
+		if err := json.Unmarshal(resp, &pageData); err != nil {
+			return nil, fmt.Errorf("failed to parse batch scrape status page: %w", err)
+		}
+
+		if pageData.Data != nil {
+			allData = append(allData, pageData.Data...)
+		}
+		current = &pageData
+		pagesCollected++
+	}
+
+	current.Data = allData
+	return current, nil
+}
+
+// GetBatchScrapeStatusPage fetches a specific page of batch scrape status results by URL.
+// Use this for manual pagination — pass the Next URL from a previous BatchScrapeStatusResponse.
+//
+// Parameters:
+//   - ctx: Context for cancellation and deadlines.
+//   - nextURL: The full URL of the next results page (from BatchScrapeStatusResponse.Next).
+//
+// Returns:
+//   - *BatchScrapeStatusResponse: The results for this page.
+//   - error: An error if the request fails or the URL is not trusted.
+func (app *FirecrawlApp) GetBatchScrapeStatusPage(ctx context.Context, nextURL string) (*BatchScrapeStatusResponse, error) {
+	if err := validatePaginationURL(app.APIURL, nextURL); err != nil {
+		return nil, fmt.Errorf("unsafe pagination URL: %w", err)
+	}
+
+	headers := app.prepareHeaders(nil)
+
+	resp, err := app.makeRequest(
+		ctx,
+		http.MethodGet,
+		nextURL,
+		nil,
+		headers,
+		"fetch batch scrape status page",
+		withRetries(3),
+		withBackoff(500),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var statusResponse BatchScrapeStatusResponse
+	if err := json.Unmarshal(resp, &statusResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse batch scrape status page: %w", err)
 	}
 
 	return &statusResponse, nil
