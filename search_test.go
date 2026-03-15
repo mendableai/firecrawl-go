@@ -137,3 +137,26 @@ func TestSearch_FailedResponse(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "search operation failed")
 }
+
+func TestSearch_RateLimited(t *testing.T) {
+	app, _ := newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate limit exceeded"})
+	})
+
+	_, err := app.Search(context.Background(), "test query", nil)
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, ErrRateLimited)
+}
+
+func TestSearch_ContextCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel before making any request
+
+	app, _ := newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("request should not be made with cancelled context")
+	})
+
+	_, err := app.Search(ctx, "test query", nil)
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+}

@@ -1,3 +1,14 @@
+## [IMP-08: Unit Tests for New Endpoints] - 2026-03-15
+
+### Added
+- `search_test.go` — `TestSearch_RateLimited`: verifies HTTP 429 maps to `ErrRateLimited` sentinel via `errors.Is`
+- `search_test.go` — `TestSearch_ContextCancelled`: verifies pre-cancelled context returns `context.Canceled` without making any HTTP request
+
+### Notes
+- IMP-01/IMP-02/IMP-03 implementations already included comprehensive tests exceeding the spec's 34-test target (search: 8, batch: 21, extract: 17 = 46 tests across those 3 files alone)
+- The two tests added here filled the only genuine gaps: rate limit error mapping and context cancellation for `Search`
+- Total test count: 155 (up from 153); all pass with race detector; `make check` passes with 0 lint issues
+
 ## [IMP-03: Extract Endpoints] - 2026-03-15
 
 ### Added
