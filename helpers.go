@@ -11,13 +11,13 @@ import (
 	"time"
 )
 
-// makeRequest makes a request to the specified URL with the provided method, data, headers, and options.
+// makeRequest makes a request to the specified URL with the provided method, body, headers, and options.
 //
 // Parameters:
 //   - ctx: Context for cancellation and deadlines.
 //   - method: The HTTP method to use for the request (e.g., "GET", "POST", "DELETE").
 //   - url: The URL to send the request to.
-//   - data: The data to be sent in the request body.
+//   - body: The pre-marshaled JSON body to send in the request. Pass nil for requests with no body.
 //   - headers: The headers to be included in the request.
 //   - action: A string describing the action being performed.
 //   - opts: Optional request options.
@@ -25,17 +25,9 @@ import (
 // Returns:
 //   - []byte: The response body from the request.
 //   - error: An error if the request fails.
-func (app *FirecrawlApp) makeRequest(ctx context.Context, method, url string, data map[string]any, headers map[string]string, action string, opts ...requestOption) ([]byte, error) {
-	var body []byte
-	var err error
-	if data != nil {
-		body, err = json.Marshal(data)
-		if err != nil {
-			return nil, err
-		}
-	}
-
+func (app *FirecrawlApp) makeRequest(ctx context.Context, method, url string, body []byte, headers map[string]string, action string, opts ...requestOption) ([]byte, error) {
 	var resp *http.Response
+	var err error
 	options := newRequestOptions(opts...)
 	for i := 0; i < options.retries; i++ {
 		if ctx.Err() != nil {

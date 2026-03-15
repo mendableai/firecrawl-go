@@ -1,3 +1,20 @@
+## [MIG-06: Core Migration — ScrapeURL v2 Migration] - 2026-03-15
+
+### Added
+- `scrape.go` — `scrapeRequest` unexported struct with `json:",omitempty"` tags for all v2 scrape parameters (URL, Formats, Headers, IncludeTags, ExcludeTags, OnlyMainContent, WaitFor, Timeout, MaxAge, MinAge, JsonOptions, Mobile, SkipTlsVerification, BlockAds, Proxy, Location, Parsers, Actions, RemoveBase64Images, StoreInCache, ZeroDataRetention)
+
+### Changed
+- `scrape.go` — `ScrapeURL`: replaced `map[string]any` body construction with `scrapeRequest` struct marshaling; changed endpoint from `/v1/scrape` to `/v2/scrape`; `json.Marshal` error returned as wrapped error
+- `helpers.go` — `makeRequest`: changed signature from `data map[string]any` to `body []byte`; removed internal `json.Marshal` call; callers are now responsible for marshaling before passing the body
+- `crawl.go` — `CrawlURL`: added `json.Marshal(crawlBody)` at call site before passing bytes to `makeRequest`
+- `crawl.go` — `AsyncCrawlURL`: added `json.Marshal(crawlBody)` at call site before passing bytes to `makeRequest`
+- `map.go` — `MapURL`: added `json.Marshal(jsonData)` at call site before passing bytes to `makeRequest`
+
+### Notes
+- GET and DELETE callers (`CheckCrawlStatus`, `CancelCrawlJob`, `monitorJobStatus`) pass `nil` body — no change required
+- `go build ./...` and `go vet ./...` pass cleanly
+- `crawl.go` and `map.go` still use `map[string]any` body construction internally — these will be converted to struct marshaling in MIG-07 and MIG-09 respectively
+
 ## [MIG-05: Core Migration — context.Context Integration] - 2026-03-15
 
 ### Changed

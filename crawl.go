@@ -91,11 +91,16 @@ func (app *FirecrawlApp) CrawlURL(ctx context.Context, url string, params *Crawl
 		actualPollInterval = pollInterval[0]
 	}
 
+	crawlBodyBytes, err := json.Marshal(crawlBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal crawl request: %w", err)
+	}
+
 	resp, err := app.makeRequest(
 		ctx,
 		http.MethodPost,
 		fmt.Sprintf("%s/v1/crawl", app.APIURL),
-		crawlBody,
+		crawlBodyBytes,
 		headers,
 		"start crawl job",
 		withRetries(3),
@@ -192,11 +197,16 @@ func (app *FirecrawlApp) AsyncCrawlURL(ctx context.Context, url string, params *
 		}
 	}
 
+	crawlBodyBytes, err := json.Marshal(crawlBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal crawl request: %w", err)
+	}
+
 	resp, err := app.makeRequest(
 		ctx,
 		http.MethodPost,
 		fmt.Sprintf("%s/v1/crawl", app.APIURL),
-		crawlBody,
+		crawlBodyBytes,
 		headers,
 		"start crawl job",
 		withRetries(3),

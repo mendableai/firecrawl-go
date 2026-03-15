@@ -48,11 +48,16 @@ func (app *FirecrawlApp) MapURL(ctx context.Context, url string, params *MapPara
 		}
 	}
 
+	jsonDataBytes, err := json.Marshal(jsonData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal map request: %w", err)
+	}
+
 	resp, err := app.makeRequest(
 		ctx,
 		http.MethodPost,
 		fmt.Sprintf("%s/v1/map", app.APIURL),
-		jsonData,
+		jsonDataBytes,
 		headers,
 		"map",
 	)
