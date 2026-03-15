@@ -2,7 +2,7 @@
 
 Go SDK for the [Firecrawl](https://firecrawl.dev) v2 API. Scrape, crawl, map, search, batch-scrape, and extract structured data from websites — with output formatted for LLMs.
 
-> **Fork of [firecrawl/firecrawl-go](https://github.com/firecrawl/firecrawl-go)** — migrated to Firecrawl API v2 with typed request structs, `context.Context` on every method, typed errors, security hardening, functional client options, and a modern CI pipeline.
+> **Fork of [firecrawl/firecrawl-go](https://github.com/ArmandoHerra/firecrawl-go)** — migrated to Firecrawl API v2 with typed request structs, `context.Context` on every method, typed errors, security hardening, functional client options, and a modern CI pipeline.
 
 ## Installation
 
@@ -497,5 +497,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, code style, and pull request g
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
-
-This SDK is a fork of [firecrawl/firecrawl-go](https://github.com/firecrawl/firecrawl-go). The upstream project may have different licensing terms.
