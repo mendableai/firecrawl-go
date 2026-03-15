@@ -57,10 +57,10 @@ func (app *FirecrawlApp) makeRequest(method, url string, data map[string]any, he
 		}
 
 		// Close body before retry — do NOT defer in loop
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		time.Sleep(time.Duration(math.Pow(2, float64(i))) * time.Duration(options.backoff) * time.Millisecond)
 	}
-	defer resp.Body.Close() // Defer close of the final response only
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -112,7 +112,8 @@ func (app *FirecrawlApp) monitorJobStatus(ID string, headers map[string]string, 
 		if status == "" {
 			return nil, fmt.Errorf("invalid status in response")
 		}
-		if status == "completed" {
+		switch status {
+		case "completed":
 			if statusData.Data != nil {
 				allData := statusData.Data
 				for statusData.Next != nil {
@@ -140,16 +141,15 @@ func (app *FirecrawlApp) monitorJobStatus(ID string, headers map[string]string, 
 				}
 				statusData.Data = allData
 				return &statusData, nil
-			} else {
-				attempts++
-				if attempts > 3 {
-					return nil, fmt.Errorf("crawl job completed but no data was returned")
-				}
 			}
-		} else if status == "active" || status == "paused" || status == "pending" || status == "queued" || status == "waiting" || status == "scraping" {
+			attempts++
+			if attempts > 3 {
+				return nil, fmt.Errorf("crawl job completed but no data was returned")
+			}
+		case "active", "paused", "pending", "queued", "waiting", "scraping":
 			pollInterval = max(pollInterval, 2)
 			time.Sleep(time.Duration(pollInterval) * time.Second)
-		} else {
+		default:
 			return nil, fmt.Errorf("crawl job failed or was stopped. Status: %s", status)
 		}
 	}
