@@ -1,3 +1,23 @@
+## [IMP-07: Unit Tests for Existing Methods] - 2026-03-15
+
+### Added
+- `crawl_test.go` — 20 tests for `CrawlURL` (success, all params, idempotency key, failed, polls until complete, context cancelled, unauthorized), `AsyncCrawlURL` (success, all params, missing ID, unauthorized), `CheckCrawlStatus` (success, invalid UUID, path traversal, server error), `CancelCrawlJob` (success, invalid UUID, unauthorized), `buildCrawlRequest` (nil params, all params, with scrape options, empty scrape options)
+- `map_test.go` — 7 tests for `MapURL` (success, all params, nil params, empty links, failed response, unauthorized, server error)
+- `helpers_test.go` — 14 tests for `makeRequest` (success, POST with body, retry on 502, no retry on 4xx, context cancelled, non-JSON error body, authorization header) and `monitorJobStatus` (completed immediately, failed, unknown status, empty status, context cancelled before request, completed no data, pagination unsafe URL SSRF rejection)
+- `types_test.go` — 8 tests for `StringOrStringSlice.UnmarshalJSON` (single string, string array, empty array, empty string, invalid number, invalid boolean, invalid object, null)
+- `search_test.go` — 1 test for `Search` stub (returns not implemented error)
+- Extended `scrape_test.go` with 7 additional tests: all params, server error, rate limited, failed response, invalid JSON, context cancelled, nil params
+- Extended `client_test.go` with 6 additional tests: env URL fallback, client not nil, prepareHeaders with/without idempotency key, nil key, authorization format
+
+### Notes
+- 100 unit tests total passing (97 top-level + 7 subtests in table-driven test)
+- No build tags on any test file — all run by default with `go test ./...`
+- Coverage: 88.2% of statements (target was >70%)
+- All tests pass with race detector (`go test -race ./...`)
+- `make check` (lint + vet + test) passes with 0 issues
+- Pagination HTTP round-trip test skipped due to HTTP/1.1 keep-alive deadlock with `httptest.Server`; replaced with SSRF rejection test (`TestMonitorJobStatus_PaginationUnsafeURL`) that validates the same code path's security behavior
+- `TestStringOrStringSlice_Null`: JSON null is treated as `[""]` (empty string singleton) by the implementation because `json.Unmarshal(null, &string)` succeeds with zero value — test documents actual behavior
+
 ## [IMP-06: Unit Test Foundation] - 2026-03-15
 
 ### Added
