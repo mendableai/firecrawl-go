@@ -1,3 +1,22 @@
+## [IMP-11: README & Documentation Polish] - 2026-03-15
+
+### Changed
+- `README.md` — Complete rewrite to document all v2 endpoints: Search, BatchScrapeURLs, AsyncBatchScrapeURLs, CheckBatchScrapeStatus, GetBatchScrapeStatusPage, Extract, AsyncExtract, CheckExtractStatus
+- `README.md` — Added API Methods tables for all 6 endpoint groups (Scrape, Crawl, Map, Search, Batch Scrape, Extract)
+- `README.md` — Added Pagination section covering both auto-pagination (PaginationConfig) and manual pagination (GetCrawlStatusPage / GetBatchScrapeStatusPage)
+- `README.md` — Added Error Handling section with sentinel error table, errors.Is and errors.As examples
+- `README.md` — Added Configuration section covering NewFirecrawlAppWithOptions, all ClientOption functions, APIKey() accessor
+- `README.md` — Added Security section documenting URL validation, ID sanitization, SSRF prevention, HTTPS warning
+- `README.md` — Updated Project Structure with all new files (batch.go, extract.go, security.go, client_options.go, all test files)
+- `README.md` — Updated test counts (160 unit tests, 32 E2E tests)
+- `README.md` — Added code examples for Search, Batch Scrape, Extract, and manual pagination
+
+### Added
+- `CONTRIBUTING.md` — New file: quick start, development workflow, code style guide, testing table, endpoint addition guide, link to full contribution guide in specs/
+
+### Notes
+- Godoc review confirmed: all public types and methods in types.go, scrape.go, crawl.go, map.go, search.go, batch.go, extract.go, errors.go, client.go, client_options.go have complete godoc comments. No additions needed.
+
 ## [IMP-09: Integration Test Modernization] - 2026-03-15
 
 ### Changed
