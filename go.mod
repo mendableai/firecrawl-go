@@ -1,4 +1,4 @@
-module github.com/mendableai/firecrawl-go/v2
+module github.com/firewcrawl/firecrawl-go/v2
 
 go 1.23
 

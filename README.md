@@ -1,186 +1,236 @@
 # Firecrawl Go SDK
 
-The Firecrawl Go SDK is a library that allows you to easily scrape and crawl websites, and output the data in a format ready for use with language models (LLMs). It provides a simple and intuitive interface for interacting with the Firecrawl API.
+Go client library for the [Firecrawl API v2](https://docs.firecrawl.dev/api-reference/v2-introduction). Scrape, crawl, and map websites with output formatted for LLMs.
 
-## Installation
+> **Fork of [firecrawl/firecrawl-go](https://github.com/firecrawl/firecrawl-go)** — migrated to Firecrawl API v2 with expanded parameters, typed request structs, `context.Context` support, and a modern CI pipeline.
 
-To install the Firecrawl Go SDK, you can
+## Quick Start
 
 ```bash
-go get github.com/mendableai/firecrawl-go/v2
+go get github.com/firecrawl/firecrawl-go/v2
 ```
-
-## Usage
-
-1. Get an API key from [firecrawl.dev](https://firecrawl.dev)
-2. Set the API key as an environment variable named `FIRECRAWL_API_KEY` or pass it as a parameter to the `FirecrawlApp` class.
-
-
-Here's an example of how to use the SDK with error handling:
 
 ```go
 package main
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"log"
 
-	"github.com/mendableai/firecrawl-go/v2"
+	"github.com/firecrawl/firecrawl-go/v2"
 )
 
 func main() {
-	// Initialize the FirecrawlApp with your API key and optional URL
-	app, err := firecrawl.NewFirecrawlApp("YOUR_API_KEY", "YOUR_API_URL")
+	app, err := firecrawl.NewFirecrawlApp("YOUR_API_KEY", "")
 	if err != nil {
-		log.Fatalf("Failed to initialize FirecrawlApp: %v", err)
+		log.Fatal(err)
 	}
 
-	// Scrape a single URL
-	scrapeResult, err := app.ScrapeURL("example.com", nil)
+	// Scrape a URL
+	doc, err := app.ScrapeURL(context.Background(), "https://example.com", nil)
 	if err != nil {
-		log.Fatalf("Failed to scrape URL: %v", err)
+		log.Fatal(err)
 	}
-	fmt.Println(scrapeResult.Markdown)
-
-	// Crawl a website
-	idempotencyKey := "idempotency-key" // optional idempotency key
-	crawlParams := &firecrawl.CrawlParams{
-		ExcludePaths: []string{"blog/*"},
-		MaxDepth:     prt(2),
-	}
-	crawlResult, err := app.CrawlURL("example.com", crawlParams, &idempotencyKey)
-	if err != nil {
-		log.Fatalf("Failed to crawl URL: %v", err)
-	}
-	jsonCrawlResult, err := json.MarshalIndent(crawlResult, "", "  ")
-	if err != nil {
-		log.Fatalf("Failed to marshal crawl result: %v", err)
-	}
-	fmt.Println(string(jsonCrawlResult))
+	fmt.Println(doc.Markdown)
 }
 ```
 
-### Scraping a URL
+## Tech Stack
 
-To scrape a single URL with error handling, use the `ScrapeURL` method. It takes the URL as a parameter and returns the scraped data as a dictionary.
+| Technology | Version | Purpose |
+|-----------|---------|---------|
+| Go | 1.23+ | Language runtime |
+| golangci-lint | v2.x | Linting (errcheck, govet, staticcheck, gosec, etc.) |
+| gofumpt | latest | Code formatting |
+| GitHub Actions | CI | Lint + test matrix (Go 1.23/1.24/1.25) |
+| testify | v1.10 | Test assertions (integration tests) |
+
+## Project Structure
+
+```
+firecrawl-go/
+├── client.go          # FirecrawlApp struct, NewFirecrawlApp(), prepareHeaders()
+├── types.go           # All request/response type definitions (31 v2 types)
+├── scrape.go          # ScrapeURL — POST /v2/scrape
+├── crawl.go           # CrawlURL, AsyncCrawlURL, CheckCrawlStatus, CancelCrawlJob
+├── map.go             # MapURL — POST /v2/map
+├── search.go          # Search — stub (v2 implementation pending)
+├── errors.go          # handleError — HTTP error mapping
+├── helpers.go         # makeRequest, monitorJobStatus — internal HTTP + polling
+├── options.go         # requestOptions, withRetries(), withBackoff()
+├── firecrawl.go       # Package doc comment
+├── firecrawl_test.go  # Integration tests (gated: //go:build integration)
+├── Makefile           # Build, test, lint, coverage targets
+├── .golangci.yml      # golangci-lint v2 configuration
+├── .github/
+│   ├── workflows/ci.yml   # CI pipeline (lint + test matrix + integration)
+│   └── dependabot.yml     # Automated dependency updates
+├── .editorconfig      # Editor settings
+├── .env.example       # Environment template for integration tests
+├── go.mod / go.sum    # Module: github.com/firecrawl/firecrawl-go/v2
+├── changelog.md       # Migration changelog
+└── LICENSE            # MIT
+```
+
+## API Methods
+
+All methods accept `context.Context` as the first parameter for cancellation and deadlines.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `ScrapeURL(ctx, url, params)` | `POST /v2/scrape` | Scrape a single URL, returns markdown/HTML/JSON |
+| `CrawlURL(ctx, url, params, key, pollInterval)` | `POST /v2/crawl` | Synchronous crawl with polling until complete |
+| `AsyncCrawlURL(ctx, url, params, key)` | `POST /v2/crawl` | Start async crawl, returns job ID |
+| `CheckCrawlStatus(ctx, id)` | `GET /v2/crawl/{id}` | Check crawl job status and retrieve results |
+| `CancelCrawlJob(ctx, id)` | `DELETE /v2/crawl/{id}` | Cancel a running crawl job |
+| `MapURL(ctx, url, params)` | `POST /v2/map` | Discover URLs on a site (returns MapLink objects) |
+| `Search(ctx, query, params)` | — | Not yet implemented (pending IMP-01) |
+
+## Usage Examples
+
+### Scrape with Options
 
 ```go
-url := "https://example.com"
-scrapedData, err := app.ScrapeURL(url, nil)
-if err != nil {
-	log.Fatalf("Failed to scrape URL: %v", err)
-}
-fmt.Println(scrapedData)
+ctx := context.Background()
+
+doc, err := app.ScrapeURL(ctx, "https://example.com", &firecrawl.ScrapeParams{
+	Formats:         []string{"markdown", "html"},
+	OnlyMainContent: ptr(true),
+	Mobile:          ptr(true),
+	BlockAds:        ptr(true),
+	Location:        &firecrawl.LocationConfig{Country: "US", Languages: []string{"en"}},
+})
 ```
 
-### Extracting structured data from a URL
-
-With LLM extraction, you can easily extract structured data from any URL. Here is how you to use it:
+### Crawl a Website
 
 ```go
-jsonSchema := map[string]any{
-	"type": "object",
-	"properties": map[string]any{
-		"top": map[string]any{
-			"type": "array",
-			"items": map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"title":       map[string]string{"type": "string"},
-					"points":      map[string]string{"type": "number"},
-					"by":          map[string]string{"type": "string"},
-					"commentsURL": map[string]string{"type": "string"},
-				},
-				"required": []string{"title", "points", "by", "commentsURL"},
-			},
-			"minItems":    5,
-			"maxItems":    5,
-			"description": "Top 5 stories on Hacker News",
-		},
-	},
-	"required": []string{"top"},
-}
+ctx := context.Background()
 
-llmExtractionParams := map[string]any{
-	"extractorOptions": firecrawl.ExtractorOptions{
-		ExtractionSchema: jsonSchema,
-	},
-}
-
-scrapeResult, err := app.ScrapeURL("https://news.ycombinator.com", llmExtractionParams)
-if err != nil {
-	log.Fatalf("Failed to perform LLM extraction: %v", err)
-}
-fmt.Println(scrapeResult)
+result, err := app.CrawlURL(ctx, "https://example.com", &firecrawl.CrawlParams{
+	Limit:             ptr(100),
+	MaxDiscoveryDepth: ptr(3),
+	CrawlEntireDomain: ptr(true),
+	Sitemap:           ptr("include"),
+	ExcludePaths:      []string{"blog/*"},
+}, nil) // no idempotency key
 ```
 
-### Crawling a Website
-
-To crawl a website, use the `CrawlUrl` method. It takes the starting URL and optional parameters as arguments. The `params` argument allows you to specify additional options for the crawl job, such as the maximum number of pages to crawl, allowed domains, and the output format.
+### Async Crawl with Context Timeout
 
 ```go
-response, err := app.CrawlURL("https://roastmywebsite.ai", nil,nil)
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+defer cancel()
 
+crawlResp, err := app.AsyncCrawlURL(ctx, "https://example.com", nil, nil)
 if err != nil {
- log.Fatalf("Failed to crawl URL: %v", err)
+	log.Fatal(err)
 }
 
-fmt.Println(response)
+// Poll for status
+status, err := app.CheckCrawlStatus(ctx, crawlResp.ID)
 ```
 
-### Asynchronous Crawl
-
-To initiate an asynchronous crawl of a website, utilize the `AsyncCrawlURL` method. This method requires the starting URL and optional parameters as inputs. The `params` argument enables you to define various settings for the asynchronous crawl, such as the maximum number of pages to crawl, permitted domains, and the output format. Upon successful initiation, this method returns an ID, which is essential for subsequently checking the status of the crawl.
+### Map a Website
 
 ```go
-response, err := app.AsyncCrawlURL("https://roastmywebsite.ai", nil, nil)
+ctx := context.Background()
 
-if err != nil {
-  log.Fatalf("Failed to crawl URL: %v", err)
+mapResp, err := app.MapURL(ctx, "https://example.com", &firecrawl.MapParams{
+	Limit:   ptr(5000),
+	Sitemap: ptr("include"),
+})
+// mapResp.Links is []MapLink with URL, Title, Description
+for _, link := range mapResp.Links {
+	fmt.Printf("%s — %s\n", link.URL, *link.Title)
 }
-
-fmt.Println(response) 
 ```
 
+## Available Commands
 
-### Checking Crawl Status
+| Command | Description |
+|---------|-------------|
+| `make help` | Show all available targets |
+| `make build` | Compile the library |
+| `make test` | Run unit tests (no API key needed) |
+| `make test-integration` | Run integration tests (requires `.env`) |
+| `make lint` | Run golangci-lint |
+| `make fmt` | Format code with gofumpt |
+| `make vet` | Run go vet |
+| `make coverage` | Generate HTML coverage report |
+| `make clean` | Remove generated files |
+| `make check` | Run lint + vet + test (full pre-commit check) |
 
-To check the status of a crawl job, use the `CheckCrawlStatus` method. It takes the crawl ID as a parameter and returns the current status of the crawl job.
+## Configuration
 
-```go
-status, err := app.CheckCrawlStatus(id)
-if err != nil {
-	log.Fatalf("Failed to check crawl status: %v", err)
-}
-fmt.Println(status)
+### Environment Variables
+
+| Variable | Used By | Required For |
+|----------|---------|-------------|
+| `FIRECRAWL_API_KEY` | SDK runtime | Production (fallback if not passed to constructor) |
+| `FIRECRAWL_API_URL` | SDK runtime | Custom API URL (defaults to `https://api.firecrawl.dev`) |
+| `TEST_API_KEY` | Integration tests | `make test-integration` |
+| `API_URL` | Integration tests | `make test-integration` |
+
+### Config Files
+
+| File | Purpose |
+|------|---------|
+| `.env.example` | Template for integration test credentials |
+| `.golangci.yml` | Linter configuration (golangci-lint v2) |
+| `.editorconfig` | Editor settings (tabs for Go, spaces for YAML) |
+| `.github/workflows/ci.yml` | CI pipeline definition |
+| `.github/dependabot.yml` | Dependency update schedule |
+
+## Development
+
+### Prerequisites
+
+- Go 1.23+
+- golangci-lint v2 (`go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest`)
+- gofumpt (`go install mvdan.cc/gofumpt@latest`)
+
+### Setup
+
+```bash
+git clone git@github.com:ArmandoHerra/firecrawl-go.git
+cd firecrawl-go
+go mod download
+make check  # lint + vet + test
 ```
 
-### Canceling a Crawl Job
-To cancel a crawl job, use the `CancelCrawlJob` method. It takes the job ID as a parameter and returns the cancellation status of the crawl job.
+### Development Loop
 
-```go
-canceled, err := app.CancelCrawlJob(jobId)
-if err != nil {
-	log.Fatalf("Failed to cancel crawl job: %v", err)
-}
-fmt.Println(canceled)
+```bash
+# Edit code...
+make fmt      # Format
+make check    # Lint + vet + test
+# Commit (pre-commit hook runs make check automatically)
 ```
 
-## Error Handling
+## Testing
 
-The SDK handles errors returned by the Firecrawl API and raises appropriate exceptions. If an error occurs during a request, an exception will be raised with a descriptive error message.
+### Unit Tests
 
-## Contributing
+```bash
+make test  # No API key needed
+```
 
-Contributions to the Firecrawl Go SDK are welcome! If you find any issues or have suggestions for improvements, please open an issue or submit a pull request on the GitHub repository.
+Unit tests use `httptest.NewServer` for mock-based testing (pending implementation via IMP-06/07).
+
+### Integration Tests
+
+```bash
+cp .env.example .env
+# Edit .env with your API key
+make test-integration  # Hits live Firecrawl API
+```
+
+Integration tests are gated behind `//go:build integration` and will not run with `make test`.
 
 ## License
 
-The Firecrawl Go SDK is licensed under the MIT License. This means you are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the SDK, subject to the following conditions:
+MIT License. See [LICENSE](LICENSE) for details.
 
-- The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-Please note that while this SDK is MIT licensed, it is part of a larger project which may be under different licensing terms. Always refer to the license information in the root directory of the main project for overall licensing details.
+This SDK is a fork of [firecrawl/firecrawl-go](https://github.com/firecrawl/firecrawl-go). The upstream project may have different licensing terms.
