@@ -1,3 +1,26 @@
+## [IMP-09: Integration Test Modernization] - 2026-03-15
+
+### Changed
+- `firecrawl_test.go` — Removed duplicate `ptr[T any]()` helper (already defined in `testhelpers_test.go`); this eliminates a symbol redefinition conflict when building with `-tags=integration`
+- `firecrawl_test.go` — Updated `TestCrawlURLWithOptionsE2E` and `TestAsyncCrawlURLWithOptionsE2E` to use v2 field names: `MaxDepth` → `MaxDiscoveryDepth`, `IgnoreSitemap: ptr(true)` → `Sitemap: ptr("skip")`, `AllowBackwardLinks` → `CrawlEntireDomain`
+- `firecrawl_test.go` — Updated `TestMapURLValidMap` to use `response.Links[0].URL` (v2 returns `[]MapLink` structs, not `[]string`)
+- `firecrawl_test.go` — Replaced `TestMapURLWithSearchParameter` (which asserted search was "not implemented in v1") with `TestMapURLWithSearchParameterE2E` that validates the v2 Map endpoint accepts a `Search` param
+
+### Added
+- `firecrawl_test.go` — `TestMapURLWithLinksE2E`: validates MapResponse returns rich `MapLink` objects with a non-empty URL field
+- `firecrawl_test.go` — `TestSearchE2E`: basic Search E2E — verifies success, non-empty web results, URL and Title populated
+- `firecrawl_test.go` — `TestSearchWithParamsE2E`: Search with Limit=3 and Country="US" — verifies result count respects limit
+- `firecrawl_test.go` — `TestSearchWithScrapeOptionsE2E`: Search with ScrapeOptions (markdown format) — verifies success
+- `firecrawl_test.go` — `TestAsyncBatchScrapeURLsE2E`: async batch scrape — verifies job ID returned and success=true
+- `firecrawl_test.go` — `TestCheckBatchScrapeStatusE2E`: checks status of a just-started batch job — verifies non-empty status field
+- `firecrawl_test.go` — `TestAsyncExtractE2E`: async extract — verifies job ID returned and success=true
+- `firecrawl_test.go` — `TestCheckExtractStatusE2E`: checks status of a just-started extract job — verifies non-empty status field
+- `firecrawl_test.go` — `TestCheckCrawlStatusWithPaginationE2E`: starts an async crawl, waits 10s, then checks status with `PaginationConfig{AutoPaginate: true, MaxPages: 2}`
+
+### Notes
+- Total integration E2E tests: 32 (23 original + 9 new). Total test functions listed under `-tags=integration`: 175 (includes all unit tests).
+- `make test-integration` requires a live `.env` with `API_URL` and `TEST_API_KEY` to run E2E tests against the live Firecrawl v2 API.
+
 ## [IMP-10: PaginationConfig Support] - 2026-03-15
 
 ### Added

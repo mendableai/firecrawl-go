@@ -18,10 +18,6 @@ import (
 var API_URL string
 var TEST_API_KEY string
 
-func ptr[T any](v T) *T {
-	return &v
-}
-
 func TestMain(m *testing.M) {
 	err := godotenv.Load(".env")
 	if err != nil {
@@ -169,12 +165,12 @@ func TestCrawlURLWithOptionsE2E(t *testing.T) {
 
 	response, err := app.CrawlURL(context.Background(), "https://www.scrapethissite.com",
 		&CrawlParams{
-			ExcludePaths:       []string{"blog/*"},
-			IncludePaths:       []string{"/"},
-			MaxDepth:           ptr(2),
-			IgnoreSitemap:      ptr(true),
-			Limit:              ptr(10),
-			AllowBackwardLinks: ptr(true),
+			ExcludePaths:      []string{"blog/*"},
+			IncludePaths:      []string{"/"},
+			MaxDiscoveryDepth: ptr(2),
+			Sitemap:           ptr("skip"),
+			Limit:             ptr(10),
+			CrawlEntireDomain: ptr(true),
 			AllowExternalLinks: ptr(true),
 			ScrapeOptions: ScrapeParams{
 				Formats:         []string{"markdown", "html", "rawHtml", "screenshot", "links"},
@@ -257,12 +253,12 @@ func TestAsyncCrawlURLWithOptionsE2E(t *testing.T) {
 
 	response, err := app.AsyncCrawlURL(context.Background(), "https://www.scrapethissite.com",
 		&CrawlParams{
-			ExcludePaths:       []string{"blog/*"},
-			IncludePaths:       []string{"/"},
-			MaxDepth:           ptr(2),
-			IgnoreSitemap:      ptr(true),
-			Limit:              ptr(10),
-			AllowBackwardLinks: ptr(true),
+			ExcludePaths:      []string{"blog/*"},
+			IncludePaths:      []string{"/"},
+			MaxDiscoveryDepth: ptr(2),
+			Sitemap:           ptr("skip"),
+			Limit:             ptr(10),
+			CrawlEntireDomain: ptr(true),
 			AllowExternalLinks: ptr(true),
 			ScrapeOptions: ScrapeParams{
 				Formats:         []string{"markdown", "html", "rawHtml", "screenshot", "links"},
@@ -391,17 +387,21 @@ func TestMapURLValidMap(t *testing.T) {
 	assert.NotNil(t, response)
 	assert.IsType(t, &MapResponse{}, response)
 	assert.Greater(t, len(response.Links), 0)
-	assert.Contains(t, response.Links[0], "https://")
-	assert.Contains(t, response.Links[0], "scrapethissite.com")
+	assert.Contains(t, response.Links[0].URL, "https://")
+	assert.Contains(t, response.Links[0].URL, "scrapethissite.com")
 }
 
-func TestMapURLWithSearchParameter(t *testing.T) {
+func TestMapURLWithSearchParameterE2E(t *testing.T) {
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	_, err = app.Search(context.Background(), "https://www.scrapethissite.com", nil)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Search is not implemented in API version 1.0.0")
+	response, err := app.MapURL(context.Background(), "https://www.scrapethissite.com", &MapParams{
+		Search: ptr("hockey"),
+		Limit:  ptr(5),
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.True(t, response.Success)
 }
 
 func TestScrapeURLWithMaxAge(t *testing.T) {
@@ -548,4 +548,151 @@ func TestScrapeURLWithJSONOptions(t *testing.T) {
 
 	// Check that the extracted data contains the expected fields
 	assert.Contains(t, response.JSON, "mission")
+}
+
+// --- Map E2E Tests ---
+
+func TestMapURLWithLinksE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	result, err := app.MapURL(context.Background(), "https://firecrawl.dev", &MapParams{
+		Limit: ptr(5),
+	})
+	require.NoError(t, err)
+	assert.True(t, result.Success)
+	assert.Greater(t, len(result.Links), 0)
+	assert.NotEmpty(t, result.Links[0].URL)
+}
+
+// --- Search E2E Tests ---
+
+func TestSearchE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	result, err := app.Search(context.Background(), "firecrawl web scraping", nil)
+	require.NoError(t, err)
+	assert.True(t, result.Success)
+	assert.Greater(t, len(result.Data.Web), 0)
+	assert.NotEmpty(t, result.Data.Web[0].URL)
+	assert.NotEmpty(t, result.Data.Web[0].Title)
+}
+
+func TestSearchWithParamsE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	result, err := app.Search(context.Background(), "firecrawl", &SearchParams{
+		Limit:   ptr(3),
+		Country: ptr("US"),
+	})
+	require.NoError(t, err)
+	assert.True(t, result.Success)
+	assert.LessOrEqual(t, len(result.Data.Web), 3)
+}
+
+func TestSearchWithScrapeOptionsE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	result, err := app.Search(context.Background(), "firecrawl", &SearchParams{
+		Limit: ptr(2),
+		ScrapeOptions: &ScrapeParams{
+			Formats: []string{"markdown"},
+		},
+	})
+	require.NoError(t, err)
+	assert.True(t, result.Success)
+}
+
+// --- Batch Scrape E2E Tests ---
+
+func TestAsyncBatchScrapeURLsE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	response, err := app.AsyncBatchScrapeURLs(
+		context.Background(),
+		[]string{"https://firecrawl.dev"},
+		nil, nil,
+	)
+	require.NoError(t, err)
+	assert.True(t, response.Success)
+	assert.NotEmpty(t, response.ID)
+}
+
+func TestCheckBatchScrapeStatusE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	// Start a batch job first.
+	response, err := app.AsyncBatchScrapeURLs(
+		context.Background(),
+		[]string{"https://firecrawl.dev"},
+		nil, nil,
+	)
+	require.NoError(t, err)
+
+	// Check status immediately — it may be scraping or completed.
+	status, err := app.CheckBatchScrapeStatus(context.Background(), response.ID)
+	require.NoError(t, err)
+	assert.NotEmpty(t, status.Status)
+}
+
+// --- Extract E2E Tests ---
+
+func TestAsyncExtractE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	response, err := app.AsyncExtract(
+		context.Background(),
+		[]string{"https://firecrawl.dev"},
+		&ExtractParams{
+			Prompt: ptr("Extract the company name"),
+		},
+	)
+	require.NoError(t, err)
+	assert.True(t, response.Success)
+	assert.NotEmpty(t, response.ID)
+}
+
+func TestCheckExtractStatusE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	response, err := app.AsyncExtract(
+		context.Background(),
+		[]string{"https://firecrawl.dev"},
+		&ExtractParams{Prompt: ptr("Extract company name")},
+	)
+	require.NoError(t, err)
+
+	status, err := app.CheckExtractStatus(context.Background(), response.ID)
+	require.NoError(t, err)
+	assert.NotEmpty(t, status.Status)
+}
+
+// --- Pagination E2E Tests ---
+
+func TestCheckCrawlStatusWithPaginationE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	// Start a crawl with enough pages to generate pagination.
+	response, err := app.AsyncCrawlURL(context.Background(), "https://docs.firecrawl.dev", &CrawlParams{
+		Limit: ptr(5),
+	}, nil)
+	require.NoError(t, err)
+
+	// Wait a bit, then check with pagination.
+	time.Sleep(10 * time.Second)
+
+	status, err := app.CheckCrawlStatus(context.Background(), response.ID, &PaginationConfig{
+		AutoPaginate: ptr(true),
+		MaxPages:     ptr(2),
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, status.Status)
 }
