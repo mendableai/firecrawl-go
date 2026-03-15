@@ -30,8 +30,11 @@ func (app *FirecrawlApp) CrawlURL(url string, params *CrawlParams, idempotencyKe
 		scrapeOpts := params.ScrapeOptions
 		if scrapeOpts.Formats != nil || scrapeOpts.Headers != nil || scrapeOpts.IncludeTags != nil ||
 			scrapeOpts.ExcludeTags != nil || scrapeOpts.OnlyMainContent != nil || scrapeOpts.WaitFor != nil ||
-			scrapeOpts.ParsePDF != nil || scrapeOpts.Timeout != nil || scrapeOpts.MaxAge != nil ||
-			scrapeOpts.JsonOptions != nil {
+			scrapeOpts.Timeout != nil || scrapeOpts.MaxAge != nil || scrapeOpts.MinAge != nil ||
+			scrapeOpts.JsonOptions != nil || scrapeOpts.Mobile != nil || scrapeOpts.SkipTlsVerification != nil ||
+			scrapeOpts.BlockAds != nil || scrapeOpts.Proxy != nil || scrapeOpts.Location != nil ||
+			scrapeOpts.Parsers != nil || scrapeOpts.Actions != nil || scrapeOpts.RemoveBase64Images != nil ||
+			scrapeOpts.StoreInCache != nil || scrapeOpts.ZeroDataRetention != nil {
 			crawlBody["scrapeOptions"] = scrapeOpts
 		}
 		if params.Webhook != nil {
@@ -46,20 +49,38 @@ func (app *FirecrawlApp) CrawlURL(url string, params *CrawlParams, idempotencyKe
 		if params.ExcludePaths != nil {
 			crawlBody["excludePaths"] = params.ExcludePaths
 		}
-		if params.MaxDepth != nil {
-			crawlBody["maxDepth"] = params.MaxDepth
+		if params.MaxDiscoveryDepth != nil {
+			crawlBody["maxDiscoveryDepth"] = params.MaxDiscoveryDepth
 		}
-		if params.AllowBackwardLinks != nil {
-			crawlBody["allowBackwardLinks"] = params.AllowBackwardLinks
+		if params.CrawlEntireDomain != nil {
+			crawlBody["crawlEntireDomain"] = params.CrawlEntireDomain
 		}
 		if params.AllowExternalLinks != nil {
 			crawlBody["allowExternalLinks"] = params.AllowExternalLinks
 		}
-		if params.IgnoreSitemap != nil {
-			crawlBody["ignoreSitemap"] = params.IgnoreSitemap
+		if params.Sitemap != nil {
+			crawlBody["sitemap"] = params.Sitemap
 		}
 		if params.IgnoreQueryParameters != nil {
 			crawlBody["ignoreQueryParameters"] = params.IgnoreQueryParameters
+		}
+		if params.AllowSubdomains != nil {
+			crawlBody["allowSubdomains"] = params.AllowSubdomains
+		}
+		if params.Delay != nil {
+			crawlBody["delay"] = params.Delay
+		}
+		if params.MaxConcurrency != nil {
+			crawlBody["maxConcurrency"] = params.MaxConcurrency
+		}
+		if params.Prompt != nil {
+			crawlBody["prompt"] = params.Prompt
+		}
+		if params.RegexOnFullURL != nil {
+			crawlBody["regexOnFullURL"] = params.RegexOnFullURL
+		}
+		if params.ZeroDataRetention != nil {
+			crawlBody["zeroDataRetention"] = params.ZeroDataRetention
 		}
 	}
 
@@ -113,8 +134,11 @@ func (app *FirecrawlApp) AsyncCrawlURL(url string, params *CrawlParams, idempote
 		scrapeOpts := params.ScrapeOptions
 		if scrapeOpts.Formats != nil || scrapeOpts.Headers != nil || scrapeOpts.IncludeTags != nil ||
 			scrapeOpts.ExcludeTags != nil || scrapeOpts.OnlyMainContent != nil || scrapeOpts.WaitFor != nil ||
-			scrapeOpts.ParsePDF != nil || scrapeOpts.Timeout != nil || scrapeOpts.MaxAge != nil ||
-			scrapeOpts.JsonOptions != nil {
+			scrapeOpts.Timeout != nil || scrapeOpts.MaxAge != nil || scrapeOpts.MinAge != nil ||
+			scrapeOpts.JsonOptions != nil || scrapeOpts.Mobile != nil || scrapeOpts.SkipTlsVerification != nil ||
+			scrapeOpts.BlockAds != nil || scrapeOpts.Proxy != nil || scrapeOpts.Location != nil ||
+			scrapeOpts.Parsers != nil || scrapeOpts.Actions != nil || scrapeOpts.RemoveBase64Images != nil ||
+			scrapeOpts.StoreInCache != nil || scrapeOpts.ZeroDataRetention != nil {
 			crawlBody["scrapeOptions"] = scrapeOpts
 		}
 		if params.Webhook != nil {
@@ -129,20 +153,38 @@ func (app *FirecrawlApp) AsyncCrawlURL(url string, params *CrawlParams, idempote
 		if params.ExcludePaths != nil {
 			crawlBody["excludePaths"] = params.ExcludePaths
 		}
-		if params.MaxDepth != nil {
-			crawlBody["maxDepth"] = params.MaxDepth
+		if params.MaxDiscoveryDepth != nil {
+			crawlBody["maxDiscoveryDepth"] = params.MaxDiscoveryDepth
 		}
-		if params.AllowBackwardLinks != nil {
-			crawlBody["allowBackwardLinks"] = params.AllowBackwardLinks
+		if params.CrawlEntireDomain != nil {
+			crawlBody["crawlEntireDomain"] = params.CrawlEntireDomain
 		}
 		if params.AllowExternalLinks != nil {
 			crawlBody["allowExternalLinks"] = params.AllowExternalLinks
 		}
-		if params.IgnoreSitemap != nil {
-			crawlBody["ignoreSitemap"] = params.IgnoreSitemap
+		if params.Sitemap != nil {
+			crawlBody["sitemap"] = params.Sitemap
 		}
 		if params.IgnoreQueryParameters != nil {
 			crawlBody["ignoreQueryParameters"] = params.IgnoreQueryParameters
+		}
+		if params.AllowSubdomains != nil {
+			crawlBody["allowSubdomains"] = params.AllowSubdomains
+		}
+		if params.Delay != nil {
+			crawlBody["delay"] = params.Delay
+		}
+		if params.MaxConcurrency != nil {
+			crawlBody["maxConcurrency"] = params.MaxConcurrency
+		}
+		if params.Prompt != nil {
+			crawlBody["prompt"] = params.Prompt
+		}
+		if params.RegexOnFullURL != nil {
+			crawlBody["regexOnFullURL"] = params.RegexOnFullURL
+		}
+		if params.ZeroDataRetention != nil {
+			crawlBody["zeroDataRetention"] = params.ZeroDataRetention
 		}
 	}
 

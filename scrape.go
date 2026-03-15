@@ -10,10 +10,10 @@ import (
 //
 // Parameters:
 //   - url: The URL to be scraped.
-//   - params: Optional parameters for the scrape request, including extractor options for LLM extraction.
+//   - params: Optional parameters for the scrape request, including formats, actions, location, and LLM extraction options.
 //
 // Returns:
-//   - *FirecrawlDocument or *FirecrawlDocumentV0: The scraped document data depending on the API version.
+//   - *FirecrawlDocument: The scraped document data.
 //   - error: An error if the scrape request fails.
 func (app *FirecrawlApp) ScrapeURL(url string, params *ScrapeParams) (*FirecrawlDocument, error) {
 	headers := app.prepareHeaders(nil)
@@ -38,17 +38,47 @@ func (app *FirecrawlApp) ScrapeURL(url string, params *ScrapeParams) (*Firecrawl
 		if params.WaitFor != nil {
 			scrapeBody["waitFor"] = params.WaitFor
 		}
-		if params.ParsePDF != nil {
-			scrapeBody["parsePDF"] = params.ParsePDF
-		}
 		if params.Timeout != nil {
 			scrapeBody["timeout"] = params.Timeout
 		}
 		if params.MaxAge != nil {
 			scrapeBody["maxAge"] = params.MaxAge
 		}
+		if params.MinAge != nil {
+			scrapeBody["minAge"] = params.MinAge
+		}
 		if params.JsonOptions != nil {
 			scrapeBody["jsonOptions"] = params.JsonOptions
+		}
+		if params.Mobile != nil {
+			scrapeBody["mobile"] = params.Mobile
+		}
+		if params.SkipTlsVerification != nil {
+			scrapeBody["skipTlsVerification"] = params.SkipTlsVerification
+		}
+		if params.BlockAds != nil {
+			scrapeBody["blockAds"] = params.BlockAds
+		}
+		if params.Proxy != nil {
+			scrapeBody["proxy"] = params.Proxy
+		}
+		if params.Location != nil {
+			scrapeBody["location"] = params.Location
+		}
+		if params.Parsers != nil {
+			scrapeBody["parsers"] = params.Parsers
+		}
+		if params.Actions != nil {
+			scrapeBody["actions"] = params.Actions
+		}
+		if params.RemoveBase64Images != nil {
+			scrapeBody["removeBase64Images"] = params.RemoveBase64Images
+		}
+		if params.StoreInCache != nil {
+			scrapeBody["storeInCache"] = params.StoreInCache
+		}
+		if params.ZeroDataRetention != nil {
+			scrapeBody["zeroDataRetention"] = params.ZeroDataRetention
 		}
 	}
 

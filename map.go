@@ -13,7 +13,7 @@ import (
 //   - params: Optional parameters for the mapping request.
 //
 // Returns:
-//   - *MapResponse: The response from the mapping operation.
+//   - *MapResponse: The response from the mapping operation, with Links as []MapLink.
 //   - error: An error if the mapping request fails.
 func (app *FirecrawlApp) MapURL(url string, params *MapParams) (*MapResponse, error) {
 	headers := app.prepareHeaders(nil)
@@ -26,11 +26,23 @@ func (app *FirecrawlApp) MapURL(url string, params *MapParams) (*MapResponse, er
 		if params.Search != nil {
 			jsonData["search"] = params.Search
 		}
-		if params.IgnoreSitemap != nil {
-			jsonData["ignoreSitemap"] = params.IgnoreSitemap
+		if params.Sitemap != nil {
+			jsonData["sitemap"] = params.Sitemap
 		}
 		if params.Limit != nil {
 			jsonData["limit"] = params.Limit
+		}
+		if params.IgnoreQueryParameters != nil {
+			jsonData["ignoreQueryParameters"] = params.IgnoreQueryParameters
+		}
+		if params.IgnoreCache != nil {
+			jsonData["ignoreCache"] = params.IgnoreCache
+		}
+		if params.Timeout != nil {
+			jsonData["timeout"] = params.Timeout
+		}
+		if params.Location != nil {
+			jsonData["location"] = params.Location
 		}
 	}
 
@@ -53,7 +65,6 @@ func (app *FirecrawlApp) MapURL(url string, params *MapParams) (*MapResponse, er
 
 	if mapResponse.Success {
 		return &mapResponse, nil
-	} else {
-		return nil, fmt.Errorf("map operation failed: %s", mapResponse.Error)
 	}
+	return nil, fmt.Errorf("map operation failed: %s", mapResponse.Error)
 }

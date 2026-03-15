@@ -1,3 +1,41 @@
+## [MIG-04: Core Migration — v2 Type Definitions] - 2026-03-15
+
+### Added
+- `types.go` — `LocationConfig` struct (Country, Languages) for geolocation configuration
+- `types.go` — `ParserConfig` struct (Type, Mode, MaxPages) replacing v1 `ParsePDF` field
+- `types.go` — `ActionConfig` struct (Type + type-specific optional fields: Milliseconds, Selector, Text, Key, Direction, Amount, Script, FullPage) for browser automation
+- `types.go` — `WebhookConfig` struct (URL, Headers, Metadata, Events) replacing v1 `*string` webhook
+- `types.go` — `MapLink` struct (URL, Title, Description) for the v2 map response format
+- `types.go` — `ActionsResult` struct (Screenshots, Scrapes, JavascriptReturns, PDFs)
+- `types.go` — `ChangeTrackingResult` struct (PreviousScrapeAt, ChangeStatus, Visibility, Diff, JSON)
+- `types.go` — `BrandingResult` struct (ColorScheme, Logo, Colors, Fonts)
+- `types.go` — `PaginationConfig` struct (AutoPaginate, MaxPages, MaxResults, MaxWaitTime)
+- `types.go` — `SearchParams` struct with all v2 fields (Limit, Sources, Categories, TBS, Location, Country, Timeout, IgnoreInvalidURLs, ScrapeOptions)
+- `types.go` — `SearchResponse`, `SearchData` structs
+- `types.go` — `SearchWebResult`, `SearchImageResult`, `SearchNewsResult` structs
+- `types.go` — `BatchScrapeParams` struct (ScrapeOptions, MaxConcurrency, IgnoreInvalidURLs, Webhook)
+- `types.go` — `BatchScrapeResponse` struct (Success, ID, URL, InvalidURLs)
+- `types.go` — `BatchScrapeStatusResponse` struct (same shape as CrawlStatusResponse with Next pagination)
+- `types.go` — `ExtractParams` struct (Prompt, Schema, EnableWebSearch, IgnoreSitemap, IncludeSubdomains, ShowSources, IgnoreInvalidURLs, ScrapeOptions)
+- `types.go` — `ExtractResponse` struct (Success, ID, InvalidURLs)
+- `types.go` — `ExtractStatusResponse` struct (Success, Status, Data, ExpiresAt, CreditsUsed)
+
+### Changed
+- `types.go` — `ScrapeParams`: removed `ParsePDF`; added `MinAge`, `Mobile`, `SkipTlsVerification`, `BlockAds`, `Proxy`, `Location`, `Parsers`, `Actions`, `RemoveBase64Images`, `StoreInCache`, `ZeroDataRetention`
+- `types.go` — `CrawlParams`: removed `MaxDepth`, `AllowBackwardLinks`, `IgnoreSitemap`, changed `Webhook *string` → `*WebhookConfig`; added `MaxDiscoveryDepth`, `Sitemap`, `CrawlEntireDomain`, `AllowSubdomains`, `Delay`, `MaxConcurrency`, `Prompt`, `RegexOnFullURL`, `ZeroDataRetention`
+- `types.go` — `MapParams`: removed `IgnoreSitemap`; added `Sitemap`, `IgnoreQueryParameters`, `IgnoreCache`, `Timeout`, `Location`
+- `types.go` — `MapResponse.Links`: changed from `[]string` to `[]MapLink`
+- `types.go` — `FirecrawlDocument`: added `Summary`, `Images`, `Actions`, `Warning`, `ChangeTracking`, `Branding`
+- `crawl.go` — `CrawlURL`/`AsyncCrawlURL`: removed references to `ParsePDF`, `MaxDepth`, `AllowBackwardLinks`, `IgnoreSitemap`; added all new v2 `CrawlParams` fields to request body construction
+- `map.go` — `MapURL`: removed `IgnoreSitemap` map key; added `Sitemap`, `IgnoreQueryParameters`, `IgnoreCache`, `Timeout`, `Location` to request body construction
+- `scrape.go` — `ScrapeURL`: removed `ParsePDF` handling; added all new v2 `ScrapeParams` fields to request body construction
+- `go.mod` — bumped Go version from `1.22.5` to `1.23`
+
+### Notes
+- `go build ./...` and `go vet ./...` pass cleanly after all changes
+- Integration test file uses `//go:build integration` tag so the removed v1 fields in that file do not block compilation — those will be updated in MIG-07/MIG-09
+- `ExtractParams.IgnoreSitemap` is kept as-is (it is a distinct Extract-specific parameter, not the removed CrawlParams field)
+
 ## [CI Fix: Resolve all golangci-lint and test failures] - 2026-03-15
 
 ### Changed
