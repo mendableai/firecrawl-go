@@ -1,3 +1,14 @@
+## [IMP-01: Search Endpoint] - 2026-03-15
+
+### Changed
+- `search.go` — Replaced stub with full `POST /v2/search` implementation. Method signature changed from `(ctx, query, *any) (any, error)` to `(ctx context.Context, query string, params *SearchParams) (*SearchResponse, error)`. Added unexported `searchRequest` struct mirroring the `SearchParams` fields plus a top-level `Query` field. Follows the established scrape/crawl/map pattern: marshal → makeRequest → unmarshal → validate `Success`.
+- `search_test.go` — Replaced the single "not implemented" stub test with 6 unit tests: `TestSearch_Success`, `TestSearch_WithParams`, `TestSearch_EmptyQuery`, `TestSearch_Unauthorized`, `TestSearch_ServerError`, `TestSearch_FailedResponse`.
+
+### Notes
+- Breaking change: `Search` method signature is no longer `*any` — callers must use `*SearchParams` (or nil).
+- All 6 new tests pass; total suite is 106 tests (0 failed, 0 skipped).
+- `make check` (lint + vet + test with race detector) passes with 0 issues.
+
 ## [IMP-15: HTTP Client Improvements] - 2026-03-15
 
 ### Added
