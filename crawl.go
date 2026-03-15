@@ -1,6 +1,7 @@
 package firecrawl
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 // CrawlURL starts a crawl job for the specified URL using the Firecrawl API.
 //
 // Parameters:
+//   - ctx: Context for cancellation and deadlines.
 //   - url: The URL to crawl.
 //   - params: Optional parameters for the crawl request.
 //   - idempotencyKey: An optional idempotency key to ensure the request is idempotent (can be nil).
@@ -17,7 +19,7 @@ import (
 // Returns:
 //   - CrawlStatusResponse: The crawl result if the job is completed.
 //   - error: An error if the crawl request fails.
-func (app *FirecrawlApp) CrawlURL(url string, params *CrawlParams, idempotencyKey *string, pollInterval ...int) (*CrawlStatusResponse, error) {
+func (app *FirecrawlApp) CrawlURL(ctx context.Context, url string, params *CrawlParams, idempotencyKey *string, pollInterval ...int) (*CrawlStatusResponse, error) {
 	var key string
 	if idempotencyKey != nil {
 		key = *idempotencyKey
@@ -90,6 +92,7 @@ func (app *FirecrawlApp) CrawlURL(url string, params *CrawlParams, idempotencyKe
 	}
 
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodPost,
 		fmt.Sprintf("%s/v1/crawl", app.APIURL),
 		crawlBody,
@@ -108,12 +111,13 @@ func (app *FirecrawlApp) CrawlURL(url string, params *CrawlParams, idempotencyKe
 		return nil, err
 	}
 
-	return app.monitorJobStatus(crawlResponse.ID, headers, actualPollInterval)
+	return app.monitorJobStatus(ctx, crawlResponse.ID, headers, actualPollInterval)
 }
 
 // AsyncCrawlURL starts a crawl job for the specified URL using the Firecrawl API.
 //
 // Parameters:
+//   - ctx: Context for cancellation and deadlines.
 //   - url: The URL to crawl.
 //   - params: Optional parameters for the crawl request.
 //   - idempotencyKey: An optional idempotency key to ensure the request is idempotent.
@@ -121,7 +125,7 @@ func (app *FirecrawlApp) CrawlURL(url string, params *CrawlParams, idempotencyKe
 // Returns:
 //   - *CrawlResponse: The crawl response with id.
 //   - error: An error if the crawl request fails.
-func (app *FirecrawlApp) AsyncCrawlURL(url string, params *CrawlParams, idempotencyKey *string) (*CrawlResponse, error) {
+func (app *FirecrawlApp) AsyncCrawlURL(ctx context.Context, url string, params *CrawlParams, idempotencyKey *string) (*CrawlResponse, error) {
 	var key string
 	if idempotencyKey != nil {
 		key = *idempotencyKey
@@ -189,6 +193,7 @@ func (app *FirecrawlApp) AsyncCrawlURL(url string, params *CrawlParams, idempote
 	}
 
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodPost,
 		fmt.Sprintf("%s/v1/crawl", app.APIURL),
 		crawlBody,
@@ -217,16 +222,18 @@ func (app *FirecrawlApp) AsyncCrawlURL(url string, params *CrawlParams, idempote
 // CheckCrawlStatus checks the status of a crawl job using the Firecrawl API.
 //
 // Parameters:
+//   - ctx: Context for cancellation and deadlines.
 //   - ID: The ID of the crawl job to check.
 //
 // Returns:
 //   - *CrawlStatusResponse: The status of the crawl job.
 //   - error: An error if the crawl status check request fails.
-func (app *FirecrawlApp) CheckCrawlStatus(ID string) (*CrawlStatusResponse, error) {
+func (app *FirecrawlApp) CheckCrawlStatus(ctx context.Context, ID string) (*CrawlStatusResponse, error) {
 	headers := app.prepareHeaders(nil)
 	apiURL := fmt.Sprintf("%s/v1/crawl/%s", app.APIURL, ID)
 
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodGet,
 		apiURL,
 		nil,
@@ -251,15 +258,17 @@ func (app *FirecrawlApp) CheckCrawlStatus(ID string) (*CrawlStatusResponse, erro
 // CancelCrawlJob cancels a crawl job using the Firecrawl API.
 //
 // Parameters:
+//   - ctx: Context for cancellation and deadlines.
 //   - ID: The ID of the crawl job to cancel.
 //
 // Returns:
 //   - string: The status of the crawl job after cancellation.
 //   - error: An error if the crawl job cancellation request fails.
-func (app *FirecrawlApp) CancelCrawlJob(ID string) (string, error) {
+func (app *FirecrawlApp) CancelCrawlJob(ctx context.Context, ID string) (string, error) {
 	headers := app.prepareHeaders(nil)
 	apiURL := fmt.Sprintf("%s/v1/crawl/%s", app.APIURL, ID)
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodDelete,
 		apiURL,
 		nil,

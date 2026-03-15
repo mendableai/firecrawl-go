@@ -1,6 +1,7 @@
 package firecrawl
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,13 +10,14 @@ import (
 // MapURL initiates a mapping operation for a URL using the Firecrawl API.
 //
 // Parameters:
+//   - ctx: Context for cancellation and deadlines.
 //   - url: The URL to map.
 //   - params: Optional parameters for the mapping request.
 //
 // Returns:
 //   - *MapResponse: The response from the mapping operation, with Links as []MapLink.
 //   - error: An error if the mapping request fails.
-func (app *FirecrawlApp) MapURL(url string, params *MapParams) (*MapResponse, error) {
+func (app *FirecrawlApp) MapURL(ctx context.Context, url string, params *MapParams) (*MapResponse, error) {
 	headers := app.prepareHeaders(nil)
 	jsonData := map[string]any{"url": url}
 
@@ -47,6 +49,7 @@ func (app *FirecrawlApp) MapURL(url string, params *MapParams) (*MapResponse, er
 	}
 
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodPost,
 		fmt.Sprintf("%s/v1/map", app.APIURL),
 		jsonData,

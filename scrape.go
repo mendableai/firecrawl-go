@@ -1,6 +1,7 @@
 package firecrawl
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,13 +10,14 @@ import (
 // ScrapeURL scrapes the content of the specified URL using the Firecrawl API.
 //
 // Parameters:
+//   - ctx: Context for cancellation and deadlines.
 //   - url: The URL to be scraped.
 //   - params: Optional parameters for the scrape request, including formats, actions, location, and LLM extraction options.
 //
 // Returns:
 //   - *FirecrawlDocument: The scraped document data.
 //   - error: An error if the scrape request fails.
-func (app *FirecrawlApp) ScrapeURL(url string, params *ScrapeParams) (*FirecrawlDocument, error) {
+func (app *FirecrawlApp) ScrapeURL(ctx context.Context, url string, params *ScrapeParams) (*FirecrawlDocument, error) {
 	headers := app.prepareHeaders(nil)
 	scrapeBody := map[string]any{"url": url}
 
@@ -83,6 +85,7 @@ func (app *FirecrawlApp) ScrapeURL(url string, params *ScrapeParams) (*Firecrawl
 	}
 
 	resp, err := app.makeRequest(
+		ctx,
 		http.MethodPost,
 		fmt.Sprintf("%s/v1/scrape", app.APIURL),
 		scrapeBody,

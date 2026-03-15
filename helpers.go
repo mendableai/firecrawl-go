@@ -14,6 +14,7 @@ import (
 // makeRequest makes a request to the specified URL with the provided method, data, headers, and options.
 //
 // Parameters:
+//   - ctx: Context for cancellation and deadlines.
 //   - method: The HTTP method to use for the request (e.g., "GET", "POST", "DELETE").
 //   - url: The URL to send the request to.
 //   - data: The data to be sent in the request body.
@@ -24,7 +25,7 @@ import (
 // Returns:
 //   - []byte: The response body from the request.
 //   - error: An error if the request fails.
-func (app *FirecrawlApp) makeRequest(method, url string, data map[string]any, headers map[string]string, action string, opts ...requestOption) ([]byte, error) {
+func (app *FirecrawlApp) makeRequest(ctx context.Context, method, url string, data map[string]any, headers map[string]string, action string, opts ...requestOption) ([]byte, error) {
 	var body []byte
 	var err error
 	if data != nil {
@@ -37,8 +38,12 @@ func (app *FirecrawlApp) makeRequest(method, url string, data map[string]any, he
 	var resp *http.Response
 	options := newRequestOptions(opts...)
 	for i := 0; i < options.retries; i++ {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
 		var req *http.Request
-		req, err = http.NewRequestWithContext(context.Background(), method, url, bytes.NewBuffer(body))
+		req, err = http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(body))
 		if err != nil {
 			return nil, err
 		}
@@ -78,6 +83,7 @@ func (app *FirecrawlApp) makeRequest(method, url string, data map[string]any, he
 // monitorJobStatus monitors the status of a crawl job using the Firecrawl API.
 //
 // Parameters:
+//   - ctx: Context for cancellation and deadlines.
 //   - ID: The ID of the crawl job to monitor.
 //   - headers: The headers to be included in the request.
 //   - pollInterval: The interval (in seconds) at which to poll the job status.
@@ -85,11 +91,16 @@ func (app *FirecrawlApp) makeRequest(method, url string, data map[string]any, he
 // Returns:
 //   - *CrawlStatusResponse: The crawl result if the job is completed.
 //   - error: An error if the crawl status check request fails.
-func (app *FirecrawlApp) monitorJobStatus(ID string, headers map[string]string, pollInterval int) (*CrawlStatusResponse, error) {
+func (app *FirecrawlApp) monitorJobStatus(ctx context.Context, ID string, headers map[string]string, pollInterval int) (*CrawlStatusResponse, error) {
 	attempts := 0
 
 	for {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
 		resp, err := app.makeRequest(
+			ctx,
 			http.MethodGet,
 			fmt.Sprintf("%s/v1/crawl/%s", app.APIURL, ID),
 			nil,
@@ -117,7 +128,12 @@ func (app *FirecrawlApp) monitorJobStatus(ID string, headers map[string]string, 
 			if statusData.Data != nil {
 				allData := statusData.Data
 				for statusData.Next != nil {
+					if ctx.Err() != nil {
+						return nil, ctx.Err()
+					}
+
 					resp, err := app.makeRequest(
+						ctx,
 						http.MethodGet,
 						*statusData.Next,
 						nil,
@@ -148,7 +164,11 @@ func (app *FirecrawlApp) monitorJobStatus(ID string, headers map[string]string, 
 			}
 		case "active", "paused", "pending", "queued", "waiting", "scraping":
 			pollInterval = max(pollInterval, 2)
-			time.Sleep(time.Duration(pollInterval) * time.Second)
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(time.Duration(pollInterval) * time.Second):
+			}
 		default:
 			return nil, fmt.Errorf("crawl job failed or was stopped. Status: %s", status)
 		}

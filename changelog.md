@@ -1,3 +1,22 @@
+## [MIG-05: Core Migration — context.Context Integration] - 2026-03-15
+
+### Changed
+- `helpers.go` — `makeRequest`: added `ctx context.Context` as first parameter; replaced `http.NewRequestWithContext(context.Background(), ...)` with `http.NewRequestWithContext(ctx, ...)`; added `ctx.Err()` check at the top of each retry iteration
+- `helpers.go` — `monitorJobStatus`: added `ctx context.Context` as first parameter; added `ctx.Err()` check at the top of the polling loop and before pagination fetches; replaced `time.Sleep(...)` with context-aware `select { case <-ctx.Done(): ... case <-time.After(...): }`; passes `ctx` to all `makeRequest` calls
+- `scrape.go` — `ScrapeURL`: added `ctx context.Context` as first parameter; passes `ctx` to `makeRequest`; updated godoc
+- `crawl.go` — `CrawlURL`: added `ctx context.Context` as first parameter; passes `ctx` to `makeRequest` and `monitorJobStatus`; updated godoc
+- `crawl.go` — `AsyncCrawlURL`: added `ctx context.Context` as first parameter; passes `ctx` to `makeRequest`; updated godoc
+- `crawl.go` — `CheckCrawlStatus`: added `ctx context.Context` as first parameter; passes `ctx` to `makeRequest`; updated godoc
+- `crawl.go` — `CancelCrawlJob`: added `ctx context.Context` as first parameter; passes `ctx` to `makeRequest`; updated godoc
+- `map.go` — `MapURL`: added `ctx context.Context` as first parameter; passes `ctx` to `makeRequest`; updated godoc
+- `search.go` — `Search`: added `ctx context.Context` as first parameter; updated godoc
+- `firecrawl_test.go` — Added `"context"` import; added `context.Background()` as first argument to all public method call sites
+
+### Notes
+- `go build ./...` and `go vet ./...` pass cleanly (integration tag excluded per build tag)
+- Breaking change for SDK consumers: all public methods now require a `context.Context` as the first argument
+- Pre-existing integration test compilation issues (removed v1 fields `MaxDepth`, `IgnoreSitemap`, `AllowBackwardLinks`) carry forward from MIG-04 and will be resolved in MIG-07
+
 ## [MIG-04: Core Migration — v2 Type Definitions] - 2026-03-15
 
 ### Added
