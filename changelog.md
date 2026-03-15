@@ -1,3 +1,21 @@
+## [MIG-07: Core Migration — CrawlURL/AsyncCrawlURL v2 Migration] - 2026-03-15
+
+### Added
+- `crawl.go` — `crawlRequest` unexported struct with `json:",omitempty"` tags for all v2 crawl parameters (URL, ScrapeOptions, Webhook, Limit, IncludePaths, ExcludePaths, MaxDiscoveryDepth, AllowExternalLinks, IgnoreQueryParameters, Sitemap, CrawlEntireDomain, AllowSubdomains, Delay, MaxConcurrency, Prompt, RegexOnFullURL, ZeroDataRetention)
+- `crawl.go` — `buildCrawlRequest` shared helper function that constructs a `crawlRequest` from URL and `*CrawlParams`; shared by `CrawlURL` and `AsyncCrawlURL` to eliminate duplicated body construction
+
+### Changed
+- `crawl.go` — `CrawlURL`: replaced `map[string]any` body construction with `buildCrawlRequest` + struct marshaling; changed endpoint from `/v1/crawl` to `/v2/crawl`
+- `crawl.go` — `AsyncCrawlURL`: replaced `map[string]any` body construction with `buildCrawlRequest` + struct marshaling; changed endpoint from `/v1/crawl` to `/v2/crawl`
+- `crawl.go` — `CheckCrawlStatus`: changed endpoint from `/v1/crawl/{id}` to `/v2/crawl/{id}`
+- `crawl.go` — `CancelCrawlJob`: changed endpoint from `/v1/crawl/{id}` to `/v2/crawl/{id}`
+- `helpers.go` — `monitorJobStatus`: changed polling URL from `/v1/crawl/%s` to `/v2/crawl/%s`
+
+### Notes
+- v1 field names (`maxDepth`, `allowBackwardLinks`, `ignoreSitemap`) are no longer sent; replaced by v2 names (`maxDiscoveryDepth`, `crawlEntireDomain`, `sitemap`)
+- `Webhook` field now accepts `*WebhookConfig` object (was previously a `*string` in v1)
+- `go build ./...` and `go vet ./...` pass cleanly
+
 ## [MIG-06: Core Migration — ScrapeURL v2 Migration] - 2026-03-15
 
 ### Added

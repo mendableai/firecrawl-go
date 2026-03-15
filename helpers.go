@@ -94,7 +94,7 @@ func (app *FirecrawlApp) monitorJobStatus(ctx context.Context, ID string, header
 		resp, err := app.makeRequest(
 			ctx,
 			http.MethodGet,
-			fmt.Sprintf("%s/v1/crawl/%s", app.APIURL, ID),
+			fmt.Sprintf("%s/v2/crawl/%s", app.APIURL, ID),
 			nil,
 			headers,
 			"check crawl status",
