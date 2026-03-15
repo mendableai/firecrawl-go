@@ -1,3 +1,25 @@
+## [MIG-02: Foundation — File Splitting] - 2026-03-15
+
+### Added
+- `client.go` — `FirecrawlApp` struct, `NewFirecrawlApp` constructor, `prepareHeaders` method
+- `types.go` — All request/response type definitions: `StringOrStringSlice`, `FirecrawlDocumentMetadata`, `JsonOptions`, `FirecrawlDocument`, `ScrapeParams`, `ScrapeResponse`, `CrawlParams`, `CrawlResponse`, `CrawlStatusResponse`, `CancelCrawlJobResponse`, `MapParams`, `MapResponse`
+- `options.go` — `requestOptions` struct, `requestOption` type, `newRequestOptions`, `withRetries`, `withBackoff`
+- `scrape.go` — `ScrapeURL` method
+- `crawl.go` — `CrawlURL`, `AsyncCrawlURL`, `CheckCrawlStatus`, `CancelCrawlJob` methods
+- `map.go` — `MapURL` method
+- `search.go` — `Search` stub method
+- `errors.go` — `handleError` method
+- `helpers.go` — `makeRequest`, `monitorJobStatus` methods
+
+### Changed
+- `firecrawl.go` — Reduced to package doc comment only; all code moved to dedicated files above
+
+### Notes
+- Pure structural refactor — zero logic changes
+- `go build ./...` passes clean
+- `go vet ./...` passes clean
+- All files use `package firecrawl`; each file imports only what it needs
+
 ## [MIG-01: Foundation — Bug Fixes] - 2026-03-15
 
 ### Fixed
