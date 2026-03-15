@@ -1,6 +1,6 @@
-module github.com/mendableai/firecrawl-go/v2
+module github.com/firewcrawl/firecrawl-go/v2
 
-go 1.22.5
+go 1.23
 
 require (
 	github.com/google/uuid v1.6.0

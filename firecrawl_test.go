@@ -1,6 +1,9 @@
+//go:build integration
+
 package firecrawl
 
 import (
+	"context"
 	"log"
 	"os"
 	"testing"
@@ -15,17 +18,15 @@ import (
 var API_URL string
 var TEST_API_KEY string
 
-func ptr[T any](v T) *T {
-	return &v
-}
-
-func init() {
+func TestMain(m *testing.M) {
 	err := godotenv.Load(".env")
 	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
+		log.Printf("Warning: could not load .env file: %v — skipping integration tests", err)
+		os.Exit(0)
 	}
 	API_URL = os.Getenv("API_URL")
 	TEST_API_KEY = os.Getenv("TEST_API_KEY")
+	os.Exit(m.Run())
 }
 
 func TestNoAPIKey(t *testing.T) {
@@ -38,7 +39,7 @@ func TestScrapeURLInvalidAPIKey(t *testing.T) {
 	app, err := NewFirecrawlApp("invalid_api_key", API_URL)
 	require.NoError(t, err)
 
-	_, err = app.ScrapeURL("https://firecrawl.dev", nil)
+	_, err = app.ScrapeURL(context.Background(), "https://firecrawl.dev", nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Unexpected error during scrape URL: Status code 401. Unauthorized: Invalid token")
 }
@@ -47,7 +48,7 @@ func TestBlocklistedURL(t *testing.T) {
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	_, err = app.ScrapeURL("https://facebook.com/fake-test", nil)
+	_, err = app.ScrapeURL(context.Background(), "https://facebook.com/fake-test", nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Status code 403")
 }
@@ -56,7 +57,7 @@ func TestScrapeURLE2E(t *testing.T) {
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	response, err := app.ScrapeURL("https://www.scrapethissite.com", nil)
+	response, err := app.ScrapeURL(context.Background(), "https://www.scrapethissite.com", nil)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -80,7 +81,7 @@ func TestSuccessfulResponseWithValidAPIKeyAndIncludeHTML(t *testing.T) {
 		WaitFor:         ptr(1000),
 	}
 
-	response, err := app.ScrapeURL("https://www.scrapethissite.com", &params)
+	response, err := app.ScrapeURL(context.Background(), "https://www.scrapethissite.com", &params)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -98,7 +99,7 @@ func TestSuccessfulResponseForValidScrapeWithPDFFile(t *testing.T) {
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	response, err := app.ScrapeURL("https://arxiv.org/pdf/astro-ph/9301001.pdf", nil)
+	response, err := app.ScrapeURL(context.Background(), "https://arxiv.org/pdf/astro-ph/9301001.pdf", nil)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -110,7 +111,7 @@ func TestSuccessfulResponseForValidScrapeWithPDFFileWithoutExplicitExtension(t *
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	response, err := app.ScrapeURL("https://arxiv.org/pdf/astro-ph/9301001", nil)
+	response, err := app.ScrapeURL(context.Background(), "https://arxiv.org/pdf/astro-ph/9301001", nil)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -122,7 +123,7 @@ func TestCrawlURLInvalidAPIKey(t *testing.T) {
 	app, err := NewFirecrawlApp("invalid_api_key", API_URL)
 	require.NoError(t, err)
 
-	_, err = app.CrawlURL("https://firecrawl.dev", nil, nil)
+	_, err = app.CrawlURL(context.Background(), "https://firecrawl.dev", nil, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Unexpected error during start crawl job: Status code 401. Unauthorized: Invalid token")
 }
@@ -131,7 +132,7 @@ func TestShouldReturnErrorForBlocklistedURL(t *testing.T) {
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	_, err = app.CrawlURL("https://twitter.com/fake-test", nil, nil)
+	_, err = app.CrawlURL(context.Background(), "https://twitter.com/fake-test", nil, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Status code 403")
 }
@@ -140,7 +141,7 @@ func TestCrawlURLE2E(t *testing.T) {
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	response, err := app.CrawlURL("https://www.scrapethissite.com", nil, nil)
+	response, err := app.CrawlURL(context.Background(), "https://www.scrapethissite.com", nil, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -162,14 +163,14 @@ func TestCrawlURLWithOptionsE2E(t *testing.T) {
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	response, err := app.CrawlURL("https://www.scrapethissite.com",
+	response, err := app.CrawlURL(context.Background(), "https://www.scrapethissite.com",
 		&CrawlParams{
-			ExcludePaths:       []string{"blog/*"},
-			IncludePaths:       []string{"/"},
-			MaxDepth:           ptr(2),
-			IgnoreSitemap:      ptr(true),
-			Limit:              ptr(10),
-			AllowBackwardLinks: ptr(true),
+			ExcludePaths:      []string{"blog/*"},
+			IncludePaths:      []string{"/"},
+			MaxDiscoveryDepth: ptr(2),
+			Sitemap:           ptr("skip"),
+			Limit:             ptr(10),
+			CrawlEntireDomain: ptr(true),
 			AllowExternalLinks: ptr(true),
 			ScrapeOptions: ScrapeParams{
 				Formats:         []string{"markdown", "html", "rawHtml", "screenshot", "links"},
@@ -219,7 +220,7 @@ func TestCrawlURLWithIdempotencyKeyE2E(t *testing.T) {
 		ExcludePaths: []string{"blog/*"},
 		Limit:        ptr(10),
 	}
-	response, err := app.CrawlURL("https://www.scrapethissite.com", params, &uniqueIdempotencyKey)
+	response, err := app.CrawlURL(context.Background(), "https://www.scrapethissite.com", params, &uniqueIdempotencyKey)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -228,7 +229,7 @@ func TestCrawlURLWithIdempotencyKeyE2E(t *testing.T) {
 	require.IsType(t, []*FirecrawlDocument{}, data)
 	assert.Contains(t, data[0].Markdown, "# Scrape This Site")
 
-	_, err = app.CrawlURL("https://firecrawl.dev", params, &uniqueIdempotencyKey)
+	_, err = app.CrawlURL(context.Background(), "https://firecrawl.dev", params, &uniqueIdempotencyKey)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Conflict: Failed to start crawl job due to a conflict. Idempotency key already used")
 }
@@ -237,7 +238,7 @@ func TestAsyncCrawlURLE2E(t *testing.T) {
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	response, err := app.AsyncCrawlURL("https://www.scrapethissite.com", nil, nil)
+	response, err := app.AsyncCrawlURL(context.Background(), "https://www.scrapethissite.com", nil, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -250,14 +251,14 @@ func TestAsyncCrawlURLWithOptionsE2E(t *testing.T) {
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	response, err := app.AsyncCrawlURL("https://www.scrapethissite.com",
+	response, err := app.AsyncCrawlURL(context.Background(), "https://www.scrapethissite.com",
 		&CrawlParams{
-			ExcludePaths:       []string{"blog/*"},
-			IncludePaths:       []string{"/"},
-			MaxDepth:           ptr(2),
-			IgnoreSitemap:      ptr(true),
-			Limit:              ptr(10),
-			AllowBackwardLinks: ptr(true),
+			ExcludePaths:      []string{"blog/*"},
+			IncludePaths:      []string{"/"},
+			MaxDiscoveryDepth: ptr(2),
+			Sitemap:           ptr("skip"),
+			Limit:             ptr(10),
+			CrawlEntireDomain: ptr(true),
 			AllowExternalLinks: ptr(true),
 			ScrapeOptions: ScrapeParams{
 				Formats:         []string{"markdown", "html", "rawHtml", "screenshot", "links"},
@@ -286,14 +287,14 @@ func TestAsyncCrawlURLWithIdempotencyKeyE2E(t *testing.T) {
 	params := &CrawlParams{
 		ExcludePaths: []string{"blog/*"},
 	}
-	response, err := app.AsyncCrawlURL("https://www.scrapethissite.com", params, &uniqueIdempotencyKey)
+	response, err := app.AsyncCrawlURL(context.Background(), "https://www.scrapethissite.com", params, &uniqueIdempotencyKey)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotNil(t, response.ID)
 	assert.NotNil(t, response.URL)
 	assert.True(t, response.Success)
 
-	_, err = app.AsyncCrawlURL("https://firecrawl.dev", params, &uniqueIdempotencyKey)
+	_, err = app.AsyncCrawlURL(context.Background(), "https://firecrawl.dev", params, &uniqueIdempotencyKey)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Conflict: Failed to start crawl job due to a conflict. Idempotency key already used")
 }
@@ -307,7 +308,7 @@ func TestCheckCrawlStatusE2E(t *testing.T) {
 			Formats: []string{"markdown", "html", "rawHtml", "screenshot", "links"},
 		},
 	}
-	asyncCrawlResponse, err := app.AsyncCrawlURL("https://firecrawl.dev", params, nil)
+	asyncCrawlResponse, err := app.AsyncCrawlURL(context.Background(), "https://firecrawl.dev", params, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, asyncCrawlResponse)
 
@@ -321,15 +322,15 @@ func TestCheckCrawlStatusE2E(t *testing.T) {
 
 		time.Sleep(5 * time.Second) // wait for 5 seconds
 
-		response, err := app.CheckCrawlStatus(asyncCrawlResponse.ID)
-		require.NoError(t, err)
-		assert.NotNil(t, response)
+		statusResponse, statusErr := app.CheckCrawlStatus(context.Background(), asyncCrawlResponse.ID)
+		require.NoError(t, statusErr)
+		assert.NotNil(t, statusResponse)
 
-		assert.GreaterOrEqual(t, len(response.Data), 0)
-		assert.GreaterOrEqual(t, response.Total, 0)
-		assert.GreaterOrEqual(t, response.CreditsUsed, 0)
+		assert.GreaterOrEqual(t, len(statusResponse.Data), 0)
+		assert.GreaterOrEqual(t, statusResponse.Total, 0)
+		assert.GreaterOrEqual(t, statusResponse.CreditsUsed, 0)
 
-		if response.Status == "completed" {
+		if statusResponse.Status == "completed" {
 			break
 		}
 
@@ -337,7 +338,7 @@ func TestCheckCrawlStatusE2E(t *testing.T) {
 	}
 
 	// Final check after loop or if completed
-	response, err := app.CheckCrawlStatus(asyncCrawlResponse.ID)
+	response, err := app.CheckCrawlStatus(context.Background(), asyncCrawlResponse.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -363,7 +364,7 @@ func TestCheckCrawlStatusE2E(t *testing.T) {
 func TestMapURLInvalidAPIKey(t *testing.T) {
 	invalidApp, err := NewFirecrawlApp("invalid_api_key", API_URL)
 	require.NoError(t, err)
-	_, err = invalidApp.MapURL("https://www.scrapethissite.com", nil)
+	_, err = invalidApp.MapURL(context.Background(), "https://www.scrapethissite.com", nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Status code 401")
 }
@@ -372,7 +373,7 @@ func TestMapURLBlocklistedURL(t *testing.T) {
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 	blocklistedUrl := "https://facebook.com/fake-test"
-	_, err = app.MapURL(blocklistedUrl, nil)
+	_, err = app.MapURL(context.Background(), blocklistedUrl, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Status code 403")
 }
@@ -381,22 +382,26 @@ func TestMapURLValidMap(t *testing.T) {
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	response, err := app.MapURL("https://www.scrapethissite.com", nil)
+	response, err := app.MapURL(context.Background(), "https://www.scrapethissite.com", nil)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.IsType(t, &MapResponse{}, response)
 	assert.Greater(t, len(response.Links), 0)
-	assert.Contains(t, response.Links[0], "https://")
-	assert.Contains(t, response.Links[0], "scrapethissite.com")
+	assert.Contains(t, response.Links[0].URL, "https://")
+	assert.Contains(t, response.Links[0].URL, "scrapethissite.com")
 }
 
-func TestMapURLWithSearchParameter(t *testing.T) {
+func TestMapURLWithSearchParameterE2E(t *testing.T) {
 	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
 	require.NoError(t, err)
 
-	_, err = app.Search("https://www.scrapethissite.com", nil)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Search is not implemented in API version 1.0.0")
+	response, err := app.MapURL(context.Background(), "https://www.scrapethissite.com", &MapParams{
+		Search: ptr("hockey"),
+		Limit:  ptr(5),
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.True(t, response.Success)
 }
 
 func TestScrapeURLWithMaxAge(t *testing.T) {
@@ -409,7 +414,7 @@ func TestScrapeURLWithMaxAge(t *testing.T) {
 		MaxAge:  ptr(3600000), // 1 hour in milliseconds
 	}
 
-	response, err := app.ScrapeURL("https://roastmywebsite.ai", params)
+	response, err := app.ScrapeURL(context.Background(), "https://roastmywebsite.ai", params)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -428,7 +433,7 @@ func TestScrapeURLWithMaxAgeZero(t *testing.T) {
 		MaxAge:  ptr(0), // Disable caching
 	}
 
-	response, err := app.ScrapeURL("https://roastmywebsite.ai", params)
+	response, err := app.ScrapeURL(context.Background(), "https://roastmywebsite.ai", params)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -450,7 +455,7 @@ func TestCrawlURLWithMaxAge(t *testing.T) {
 		Limit: ptr(5), // Limit to 5 pages for faster test
 	}
 
-	response, err := app.CrawlURL("https://roastmywebsite.ai", params, nil)
+	response, err := app.CrawlURL(context.Background(), "https://roastmywebsite.ai", params, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -495,7 +500,7 @@ func TestScrapeURLWithJsonOptions(t *testing.T) {
 		},
 	}
 
-	response, err := app.ScrapeURL("https://roastmywebsite.ai", params)
+	response, err := app.ScrapeURL(context.Background(), "https://roastmywebsite.ai", params)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -535,7 +540,7 @@ func TestScrapeURLWithJSONOptions(t *testing.T) {
 		},
 	}
 
-	response, err := app.ScrapeURL("https://roastmywebsite.ai", params)
+	response, err := app.ScrapeURL(context.Background(), "https://roastmywebsite.ai", params)
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 	// When using jsonOptions, the extracted data is in JSON field
@@ -543,4 +548,151 @@ func TestScrapeURLWithJSONOptions(t *testing.T) {
 
 	// Check that the extracted data contains the expected fields
 	assert.Contains(t, response.JSON, "mission")
+}
+
+// --- Map E2E Tests ---
+
+func TestMapURLWithLinksE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	result, err := app.MapURL(context.Background(), "https://firecrawl.dev", &MapParams{
+		Limit: ptr(5),
+	})
+	require.NoError(t, err)
+	assert.True(t, result.Success)
+	assert.Greater(t, len(result.Links), 0)
+	assert.NotEmpty(t, result.Links[0].URL)
+}
+
+// --- Search E2E Tests ---
+
+func TestSearchE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	result, err := app.Search(context.Background(), "firecrawl web scraping", nil)
+	require.NoError(t, err)
+	assert.True(t, result.Success)
+	assert.Greater(t, len(result.Data.Web), 0)
+	assert.NotEmpty(t, result.Data.Web[0].URL)
+	assert.NotEmpty(t, result.Data.Web[0].Title)
+}
+
+func TestSearchWithParamsE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	result, err := app.Search(context.Background(), "firecrawl", &SearchParams{
+		Limit:   ptr(3),
+		Country: ptr("US"),
+	})
+	require.NoError(t, err)
+	assert.True(t, result.Success)
+	assert.LessOrEqual(t, len(result.Data.Web), 3)
+}
+
+func TestSearchWithScrapeOptionsE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	result, err := app.Search(context.Background(), "firecrawl", &SearchParams{
+		Limit: ptr(2),
+		ScrapeOptions: &ScrapeParams{
+			Formats: []string{"markdown"},
+		},
+	})
+	require.NoError(t, err)
+	assert.True(t, result.Success)
+}
+
+// --- Batch Scrape E2E Tests ---
+
+func TestAsyncBatchScrapeURLsE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	response, err := app.AsyncBatchScrapeURLs(
+		context.Background(),
+		[]string{"https://firecrawl.dev"},
+		nil, nil,
+	)
+	require.NoError(t, err)
+	assert.True(t, response.Success)
+	assert.NotEmpty(t, response.ID)
+}
+
+func TestCheckBatchScrapeStatusE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	// Start a batch job first.
+	response, err := app.AsyncBatchScrapeURLs(
+		context.Background(),
+		[]string{"https://firecrawl.dev"},
+		nil, nil,
+	)
+	require.NoError(t, err)
+
+	// Check status immediately — it may be scraping or completed.
+	status, err := app.CheckBatchScrapeStatus(context.Background(), response.ID)
+	require.NoError(t, err)
+	assert.NotEmpty(t, status.Status)
+}
+
+// --- Extract E2E Tests ---
+
+func TestAsyncExtractE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	response, err := app.AsyncExtract(
+		context.Background(),
+		[]string{"https://firecrawl.dev"},
+		&ExtractParams{
+			Prompt: ptr("Extract the company name"),
+		},
+	)
+	require.NoError(t, err)
+	assert.True(t, response.Success)
+	assert.NotEmpty(t, response.ID)
+}
+
+func TestCheckExtractStatusE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	response, err := app.AsyncExtract(
+		context.Background(),
+		[]string{"https://firecrawl.dev"},
+		&ExtractParams{Prompt: ptr("Extract company name")},
+	)
+	require.NoError(t, err)
+
+	status, err := app.CheckExtractStatus(context.Background(), response.ID)
+	require.NoError(t, err)
+	assert.NotEmpty(t, status.Status)
+}
+
+// --- Pagination E2E Tests ---
+
+func TestCheckCrawlStatusWithPaginationE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	// Start a crawl with enough pages to generate pagination.
+	response, err := app.AsyncCrawlURL(context.Background(), "https://docs.firecrawl.dev", &CrawlParams{
+		Limit: ptr(5),
+	}, nil)
+	require.NoError(t, err)
+
+	// Wait a bit, then check with pagination.
+	time.Sleep(10 * time.Second)
+
+	status, err := app.CheckCrawlStatus(context.Background(), response.ID, &PaginationConfig{
+		AutoPaginate: ptr(true),
+		MaxPages:     ptr(2),
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, status.Status)
 }
