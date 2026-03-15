@@ -413,7 +413,7 @@ firecrawl-go/
 ├── .editorconfig          # Editor settings
 ├── .env.example           # Environment template for integration tests
 ├── go.mod / go.sum        # Module: github.com/firecrawl/firecrawl-go/v2
-├── changelog.md           # Migration and improvement changelog
+├── CHANGELOG.md           # Keep a Changelog format — all migration and improvement changes
 └── LICENSE                # MIT
 ```
 
