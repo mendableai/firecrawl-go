@@ -1,3 +1,26 @@
+## [MIG-03: Foundation — CI/CD Pipeline Setup] - 2026-03-15
+
+### Added
+- `Makefile` — `help`, `build`, `test`, `test-integration`, `lint`, `fmt`, `vet`, `coverage`, `clean`, `check` targets; `.DEFAULT_GOAL := help`
+- `.golangci.yml` — golangci-lint config enabling errcheck (with check-type-assertions), govet (enable-all), staticcheck, gosimple, unused, ineffassign, gofumpt, misspell, bodyclose, noctx, gosec (G402 excluded), prealloc; 5m timeout
+- `.github/workflows/ci.yml` — Three-job CI pipeline: `lint` (Go 1.23, golangci-lint-action v6), `test` (matrix Go 1.22/1.23, race detector, 80% coverage threshold), `integration` (push to main only, needs lint+test, uses FIRECRAWL_API_KEY secret)
+- `.github/dependabot.yml` — Weekly updates for gomod and github-actions ecosystems
+- `.editorconfig` — Tabs for Go/Makefile, spaces for YAML, LF line endings, final newline
+- `go build ./...` and `go vet ./...` both verified passing via Makefile targets
+
+### Changed
+- `.gitignore` — Added `coverage.out`, `coverage.html`, `*.test`, `*.prof`; `vendor` corrected to `vendor/`
+- `.env.example` — Updated API_URL to `https://api.firecrawl.dev` (was localhost), added descriptive comment
+
+### Fixed
+- Deleted `firecrawl_test.go_V0` (dead v0 test file with no build tag; was included in `go test ./...` but all tests required an API key)
+
+### Notes
+- `make build` passes clean
+- `make vet` passes clean
+- CI coverage threshold (80%) will be enforced once unit tests are added in MIG-07 (IMP-06)
+- Concurrency group cancels in-progress runs on same ref to avoid redundant CI runs
+
 ## [MIG-02: Foundation — File Splitting] - 2026-03-15
 
 ### Added

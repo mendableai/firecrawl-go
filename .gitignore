@@ -1,2 +1,6 @@
 .env
-vendor
+coverage.out
+coverage.html
+vendor/
+*.test
+*.prof
