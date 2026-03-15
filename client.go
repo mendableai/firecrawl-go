@@ -31,7 +31,7 @@ func NewFirecrawlApp(apiKey, apiURL string, timeout ...time.Duration) (*Firecraw
 	if apiKey == "" {
 		apiKey = os.Getenv("FIRECRAWL_API_KEY")
 		if apiKey == "" {
-			return nil, fmt.Errorf("no API key provided")
+			return nil, fmt.Errorf("%w", ErrNoAPIKey)
 		}
 	}
 

@@ -1,3 +1,19 @@
+## [IMP-04: Typed Error System] - 2026-03-15
+
+### Added
+- 8 exported sentinel errors: `ErrNoAPIKey`, `ErrUnauthorized`, `ErrPaymentRequired`, `ErrNotFound`, `ErrTimeout`, `ErrConflict`, `ErrRateLimited`, `ErrServerError`
+- `APIError` struct with `StatusCode`, `Message`, and `Action` fields
+- `APIError.Error()` — returns `"API error <code> during <action>: <message>"`
+- `APIError.Unwrap()` — maps HTTP status codes to sentinel errors enabling `errors.Is()`
+
+### Changed
+- `handleError` now returns `*APIError` instead of `errors.New(string)` — callers can use `errors.Is(err, firecrawl.ErrRateLimited)` and `errors.As(err, &apiErr)`
+- `NewFirecrawlApp` wraps `ErrNoAPIKey` with `fmt.Errorf("%w", ErrNoAPIKey)` — callers can use `errors.Is(err, firecrawl.ErrNoAPIKey)`
+
+### Notes
+- Error message format changed from `"Payment Required: Failed to..."` to `"API error 402 during ..."` — callers should not parse error strings; use `errors.Is`/`errors.As` instead
+- All existing integration tests still pass; `make check` (lint + vet) passes cleanly
+
 ## [MIG-11: Core Migration — Request Body Refactor Verification] - 2026-03-15
 
 ### Notes
