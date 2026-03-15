@@ -1,3 +1,17 @@
+## [IMP-06: Unit Test Foundation] - 2026-03-15
+
+### Added
+- `testhelpers_test.go` — mock server helpers: `newMockServer` (creates `httptest.Server` + `FirecrawlApp` pointed at it with automatic cleanup via `t.Cleanup`), `respondJSON` (writes JSON responses in mock handlers), `decodeJSONBody` (decodes request bodies in mock handlers), `ptr[T]` (generic pointer helper for constructing test params)
+- `client_test.go` — 4 constructor unit tests: `TestNewFirecrawlApp_ValidKey`, `TestNewFirecrawlApp_EmptyKey`, `TestNewFirecrawlApp_DefaultURL`, `TestNewFirecrawlApp_EnvFallback`
+- `errors_test.go` — 4 error handling unit tests: `TestHandleError_StatusCodes` (table-driven, 7 subtests for all sentinel errors), `TestHandleError_InvalidJSON`, `TestHandleError_UnknownStatusCode`, `TestAPIError_ErrorMessage`
+- `scrape_test.go` — 3 scrape unit tests using mock server: `TestScrapeURL_Success`, `TestScrapeURL_WithParams`, `TestScrapeURL_Unauthorized`
+
+### Notes
+- All new test files have NO `//go:build` tag — they run by default with `go test ./...`
+- Tests run without API key or `.env` file using `httptest.NewServer`
+- 26 total unit tests now pass (12 pre-existing security tests + 14 new)
+- `make check` (lint + vet + test) passes with 0 issues
+
 ## [IMP-05: Security Hardening] - 2026-03-15
 
 ### Added
