@@ -154,15 +154,17 @@ func (app *FirecrawlApp) monitorJobStatus(ctx context.Context, ID string, header
 			if attempts > 3 {
 				return nil, fmt.Errorf("crawl job completed but no data was returned")
 			}
-		case "active", "paused", "pending", "queued", "waiting", "scraping":
+		case "scraping":
 			pollInterval = max(pollInterval, 2)
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			case <-time.After(time.Duration(pollInterval) * time.Second):
 			}
+		case "failed":
+			return nil, fmt.Errorf("crawl job failed. Status: %s", status)
 		default:
-			return nil, fmt.Errorf("crawl job failed or was stopped. Status: %s", status)
+			return nil, fmt.Errorf("unknown crawl status: %s", status)
 		}
 	}
 }

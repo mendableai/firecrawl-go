@@ -1,3 +1,13 @@
+## [MIG-08: Core Migration — CheckCrawlStatus/CancelCrawlJob v2 Migration] - 2026-03-15
+
+### Changed
+- `helpers.go` — `monitorJobStatus`: replaced v1 polling status list (`"active", "paused", "pending", "queued", "waiting", "scraping"`) with the single v2 polling status `"scraping"`; added explicit `"failed"` case returning a descriptive error; changed default case error message to `"unknown crawl status: %s"` instead of the v1-era catch-all
+
+### Notes
+- v2 API uses three status values only: `"scraping"` (poll), `"completed"` (done), `"failed"` (error)
+- `CheckCrawlStatus` and `CancelCrawlJob` paths were already on `/v2/crawl/{id}` from MIG-07; confirmed correct
+- `go build ./...` and `go vet ./...` pass cleanly
+
 ## [MIG-07: Core Migration — CrawlURL/AsyncCrawlURL v2 Migration] - 2026-03-15
 
 ### Added
