@@ -1,3 +1,18 @@
+## [IMP-02: Batch Scrape Endpoints] - 2026-03-15
+
+### Added
+- `batch.go` — `batchScrapeRequest` unexported struct (URLs, ScrapeOptions, MaxConcurrency, IgnoreInvalidURLs, Webhook) for internal request marshaling
+- `batch.go` — `AsyncBatchScrapeURLs(ctx, urls, params, idempotencyKey)` — POST `/v2/batch/scrape`, returns `*BatchScrapeResponse` with job ID; passes idempotency key header when provided; omits ScrapeOptions from payload when all fields are zero-value
+- `batch.go` — `BatchScrapeURLs(ctx, urls, params, idempotencyKey, pollInterval...)` — sync wrapper that calls `AsyncBatchScrapeURLs` then polls via `monitorBatchScrapeStatus`; default poll interval is 2 seconds
+- `batch.go` — `CheckBatchScrapeStatus(ctx, id)` — GET `/v2/batch/scrape/{id}`, validates `id` via `validateJobID` (UUID check, path injection prevention), returns `*BatchScrapeStatusResponse`
+- `batch.go` — `monitorBatchScrapeStatus(ctx, id, headers, pollInterval)` — internal polling loop mirroring `monitorJobStatus`; handles "scraping" (wait), "completed" (paginate via Next URLs), "failed" (error), and empty/unknown status; validates each Next URL via `validatePaginationURL` (SSRF prevention)
+- `batch_test.go` — 21 unit tests: `TestAsyncBatchScrapeURLs_Success`, `TestAsyncBatchScrapeURLs_WithParams`, `TestAsyncBatchScrapeURLs_WithIdempotencyKey`, `TestAsyncBatchScrapeURLs_MissingID`, `TestAsyncBatchScrapeURLs_Unauthorized`, `TestBatchScrapeURLs_PollsUntilComplete`, `TestBatchScrapeURLs_ContextCancelled`, `TestBatchScrapeURLs_Failed`, `TestBatchScrapeURLs_DefaultPollInterval`, `TestCheckBatchScrapeStatus_Success`, `TestCheckBatchScrapeStatus_Scraping`, `TestCheckBatchScrapeStatus_InvalidID`, `TestCheckBatchScrapeStatus_PathTraversalID`, `TestCheckBatchScrapeStatus_Unauthorized`, `TestMonitorBatchScrapeStatus_CompletedImmediately`, `TestMonitorBatchScrapeStatus_Failed`, `TestMonitorBatchScrapeStatus_UnknownStatus`, `TestMonitorBatchScrapeStatus_EmptyStatus`, `TestMonitorBatchScrapeStatus_ContextCancelledBeforeRequest`, `TestMonitorBatchScrapeStatus_CompletedNoData`, `TestMonitorBatchScrapeStatus_PaginationUnsafeURL`
+
+### Notes
+- `monitorBatchScrapeStatus` enforces a minimum 2-second poll interval when status is "scraping" (matches `monitorJobStatus` behavior)
+- SSRF protection: each Next pagination URL is validated against the configured API host before following
+- All 127 tests pass (`go test -race ./...`); `make check` (lint + vet + test) passes with 0 issues
+
 ## [IMP-01: Search Endpoint] - 2026-03-15
 
 ### Changed
