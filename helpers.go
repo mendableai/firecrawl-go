@@ -124,6 +124,10 @@ func (app *FirecrawlApp) monitorJobStatus(ctx context.Context, ID string, header
 						return nil, ctx.Err()
 					}
 
+					if err := validatePaginationURL(app.APIURL, *statusData.Next); err != nil {
+						return nil, fmt.Errorf("unsafe pagination URL: %w", err)
+					}
+
 					resp, err := app.makeRequest(
 						ctx,
 						http.MethodGet,

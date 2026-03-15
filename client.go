@@ -2,17 +2,33 @@ package firecrawl
 
 import (
 	"fmt"
+	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 )
 
 // FirecrawlApp represents a client for the Firecrawl API.
 type FirecrawlApp struct {
-	APIKey  string
+	apiKey  string // unexported — use APIKey() accessor
 	APIURL  string
 	Client  *http.Client
 	Version string
+}
+
+// APIKey returns the configured API key.
+func (app *FirecrawlApp) APIKey() string {
+	return app.apiKey
+}
+
+// String returns a human-readable representation with the API key redacted.
+func (app *FirecrawlApp) String() string {
+	redacted := "***"
+	if len(app.apiKey) > 7 {
+		redacted = app.apiKey[:3] + "..." + app.apiKey[len(app.apiKey)-4:]
+	}
+	return fmt.Sprintf("FirecrawlApp{url: %s, key: %s}", app.APIURL, redacted)
 }
 
 // NewFirecrawlApp creates a new instance of FirecrawlApp with the provided API key and API URL.
@@ -42,6 +58,15 @@ func NewFirecrawlApp(apiKey, apiURL string, timeout ...time.Duration) (*Firecraw
 		}
 	}
 
+	// Warn when a non-localhost HTTP URL is used — API key will be sent in cleartext.
+	parsedURL, err := url.Parse(apiURL)
+	if err == nil && parsedURL.Scheme == "http" {
+		host := parsedURL.Hostname()
+		if host != "localhost" && host != "127.0.0.1" && host != "::1" {
+			log.Println("WARNING: firecrawl-go: API URL uses HTTP. API key will be transmitted in cleartext. Use HTTPS in production.")
+		}
+	}
+
 	t := 120 * time.Second // default
 	if len(timeout) > 0 {
 		t = timeout[0]
@@ -53,7 +78,7 @@ func NewFirecrawlApp(apiKey, apiURL string, timeout ...time.Duration) (*Firecraw
 	}
 
 	return &FirecrawlApp{
-		APIKey: apiKey,
+		apiKey: apiKey,
 		APIURL: apiURL,
 		Client: client,
 	}, nil
@@ -70,7 +95,7 @@ func NewFirecrawlApp(apiKey, apiURL string, timeout ...time.Duration) (*Firecraw
 func (app *FirecrawlApp) prepareHeaders(idempotencyKey *string) map[string]string {
 	headers := map[string]string{
 		"Content-Type":  "application/json",
-		"Authorization": fmt.Sprintf("Bearer %s", app.APIKey),
+		"Authorization": fmt.Sprintf("Bearer %s", app.apiKey),
 	}
 	if idempotencyKey != nil {
 		headers["x-idempotency-key"] = *idempotencyKey

@@ -192,6 +192,9 @@ func (app *FirecrawlApp) AsyncCrawlURL(ctx context.Context, url string, params *
 //   - *CrawlStatusResponse: The status of the crawl job.
 //   - error: An error if the crawl status check request fails.
 func (app *FirecrawlApp) CheckCrawlStatus(ctx context.Context, ID string) (*CrawlStatusResponse, error) {
+	if err := validateJobID(ID); err != nil {
+		return nil, err
+	}
 	headers := app.prepareHeaders(nil)
 	apiURL := fmt.Sprintf("%s/v2/crawl/%s", app.APIURL, ID)
 
@@ -228,6 +231,9 @@ func (app *FirecrawlApp) CheckCrawlStatus(ctx context.Context, ID string) (*Craw
 //   - string: The status of the crawl job after cancellation.
 //   - error: An error if the crawl job cancellation request fails.
 func (app *FirecrawlApp) CancelCrawlJob(ctx context.Context, ID string) (string, error) {
+	if err := validateJobID(ID); err != nil {
+		return "", err
+	}
 	headers := app.prepareHeaders(nil)
 	apiURL := fmt.Sprintf("%s/v2/crawl/%s", app.APIURL, ID)
 	resp, err := app.makeRequest(

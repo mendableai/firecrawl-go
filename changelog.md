@@ -1,3 +1,26 @@
+## [IMP-05: Security Hardening] - 2026-03-15
+
+### Added
+- `security.go` — `validatePaginationURL(baseURL, nextURL string) error`: validates that a Next pagination URL's host matches the SDK's configured API URL host, preventing SSRF via attacker-controlled Next URLs in API responses
+- `security.go` — `validateJobID(id string) error`: validates that a job ID is a valid UUID, preventing path injection attacks (e.g., `../../admin`) in crawl endpoints
+- `client.go` — `FirecrawlApp.APIKey() string` accessor method: returns the configured API key via a method rather than direct field access
+- `client.go` — `FirecrawlApp.String() string`: implements `fmt.Stringer` with API key redaction (shows first 3 chars + `...` + last 4 chars); protects against credential leakage via accidental logging
+- `client.go` — HTTPS warning: `NewFirecrawlApp` logs a `WARNING` via `log.Printf` when a non-localhost HTTP URL is provided, alerting users that the API key will be transmitted in cleartext
+- `security_test.go` — 14 unit tests covering all security functions and behaviors
+
+### Changed
+- `client.go` — `FirecrawlApp.APIKey` field renamed from exported `APIKey string` to unexported `apiKey string`; use the new `APIKey()` accessor method instead — **BREAKING CHANGE**
+- `client.go` — Constructor `NewFirecrawlApp` updated to set `apiKey` (unexported field)
+- `client.go` — `prepareHeaders` updated to use `app.apiKey`
+- `helpers.go` — `monitorJobStatus`: validates each Next pagination URL via `validatePaginationURL` before following it; returns error if host does not match API URL
+- `crawl.go` — `CheckCrawlStatus`: validates the `ID` parameter via `validateJobID` before constructing the URL
+- `crawl.go` — `CancelCrawlJob`: validates the `ID` parameter via `validateJobID` before constructing the URL
+
+### Notes
+- **Breaking change**: `FirecrawlApp.APIKey` (exported field) is now `apiKey` (unexported). Callers that read `app.APIKey` directly must switch to `app.APIKey()`. This affects any external code that accessed the field directly; the method accessor has the same name and returns the same value.
+- HTTPS warning is `log.Printf` only — non-blocking. Self-hosted HTTP deployments on localhost are exempt from the warning.
+- `go build ./...`, `go vet ./...`, and `go test ./...` all pass cleanly (14 unit tests, 0 failures)
+
 ## [IMP-04: Typed Error System] - 2026-03-15
 
 ### Added
