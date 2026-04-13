@@ -1,5 +1,13 @@
 # Firecrawl Go SDK
 
+> [!WARNING]
+> **Deprecated:** This module is no longer maintained.
+> Install the new Go SDK instead:
+> ```bash
+> go get github.com/firecrawl/firecrawl/apps/go-sdk
+> ```
+> Repository: https://github.com/firecrawl/firecrawl/tree/main/apps/go-sdk
+
 The Firecrawl Go SDK is a library that allows you to easily scrape and crawl websites, and output the data in a format ready for use with language models (LLMs). It provides a simple and intuitive interface for interacting with the Firecrawl API.
 
 ## Installation
