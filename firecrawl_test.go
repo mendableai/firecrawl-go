@@ -3,6 +3,7 @@ package firecrawl
 import (
 	"log"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -543,4 +544,138 @@ func TestScrapeURLWithJSONOptions(t *testing.T) {
 
 	// Check that the extracted data contains the expected fields
 	assert.Contains(t, response.JSON, "mission")
+}
+
+func TestBatchScrapeInvalidAPIKey(t *testing.T) {
+	app, err := NewFirecrawlApp("invalid_api_key", API_URL)
+	require.NoError(t, err)
+
+	params := &BatchScrapeParams{
+		URLs: []string{"https://www.scrapethissite.com"},
+	}
+	_, err = app.BatchScrape(params)
+	assert.Error(t, err)
+	assert.True(t,
+		strings.Contains(err.Error(), "Unauthorized") ||
+			strings.Contains(err.Error(), "Internal Server Error") ||
+			strings.Contains(err.Error(), "Status code 401") ||
+			strings.Contains(err.Error(), "Status code 500"),
+		"Expected error to contain 'Unauthorized' or server error, got: %s", err.Error())
+}
+
+func TestBatchScrapeE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	params := &BatchScrapeParams{
+		URLs: []string{
+			"https://www.scrapethissite.com",
+			"https://roastmywebsite.ai",
+		},
+		Formats:         []interface{}{"markdown"},
+		OnlyMainContent: ptr(true),
+	}
+
+	response, err := app.BatchScrape(params)
+	require.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.True(t, response.Success)
+	assert.NotEmpty(t, response.ID)
+	assert.NotEmpty(t, response.URL)
+}
+
+func TestBatchScrapeWithOptionsE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	params := &BatchScrapeParams{
+		URLs: []string{
+			"https://www.scrapethissite.com",
+		},
+		Formats:            []interface{}{"markdown", "html"},
+		OnlyMainContent:    ptr(true),
+		MaxConcurrency:     ptr(2),
+		IgnoreInvalidURLs:  ptr(true),
+		MaxAge:             ptr(3600000),
+		WaitFor:            ptr(1000),
+		Mobile:             ptr(false),
+		BlockAds:           ptr(true),
+		RemoveBase64Images: ptr(true),
+		StoreInCache:       ptr(true),
+	}
+
+	response, err := app.BatchScrape(params)
+	require.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.True(t, response.Success)
+	assert.NotEmpty(t, response.ID)
+	assert.NotEmpty(t, response.URL)
+}
+
+func TestBatchScrapeWithWebhookE2E(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	params := &BatchScrapeParams{
+		URLs: []string{
+			"https://www.scrapethissite.com",
+		},
+		Formats: []interface{}{"markdown"},
+		Webhook: &WebhookSpec{
+			URL:    "https://example.com/webhook",
+			Events: []string{"completed", "page"},
+		},
+	}
+
+	response, err := app.BatchScrape(params)
+	require.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.True(t, response.Success)
+	assert.NotEmpty(t, response.ID)
+}
+
+func TestBatchScrapeWithInvalidURLs(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	params := &BatchScrapeParams{
+		URLs: []string{
+			"https://www.scrapethissite.com",
+			"not-a-valid-url",
+			"https://roastmywebsite.ai",
+		},
+		Formats:           []interface{}{"markdown"},
+		IgnoreInvalidURLs: ptr(true),
+	}
+
+	response, err := app.BatchScrape(params)
+	require.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.True(t, response.Success)
+	assert.NotEmpty(t, response.ID)
+	if response.InvalidURLs != nil {
+		assert.Contains(t, response.InvalidURLs, "not-a-valid-url")
+	}
+}
+
+func TestBatchScrapeEmptyURLs(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	params := &BatchScrapeParams{
+		URLs: []string{},
+	}
+
+	_, err = app.BatchScrape(params)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "urls are required")
+}
+
+func TestBatchScrapeNilParams(t *testing.T) {
+	app, err := NewFirecrawlApp(TEST_API_KEY, API_URL)
+	require.NoError(t, err)
+
+	_, err = app.BatchScrape(nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "urls are required")
 }
